@@ -1,140 +1,132 @@
-#!/usr/bin/python
-# -*- coding: latin-1 -*-
+#!/usr/bin/env python
 
-# gtx_etract
-# Provides functions for rendering Wii U GTX images.
-
-# Copyright (C) 2014-2016 Treeki, RoadrunnerWMC, MrRean, Grop
-
-# Based on GTX Extractor by Treeki
-
-# Portions of this code are based on Wii U GTX Extractor (https://github.com/Treeki/RandomStuff):
-#   (README.markdown:)
-#     Wii U GTX Extractor
-#
-#     Extracts textures in RGBA8 and DXT5 formats from the 'Gfx2' (.gtx file extension)
-#     format used in Wii U games. A bit of work could get it to extract .bflim files, too.
-#
-#     Somewhat unfinished, pretty buggy. Use at your own risk. It's not great, but I figured
-#     I'd throw it out there to save other people the work I already did.
-#
-#     More details on compilation and usage in the comments inside the file.
-#
-#  (Header of gtx_extract.c:)
-#     Wii U 'GTX' Texture Extractor
-#     Created by Ninji Vahran / Treeki; 2014-10-31
-#     ( https://github.com/Treeki )
-#     This software is released into the public domain.
-#
-#     Dependencies: libtxc_dxtn, libpng
-#     Tested with GCC on Arch Linux. May fail elsewhere.
-#     Expect it to fail anywhere, really ;)
-#
-#     gcc -lpng -ltxc_dxtn -o gtx_extract gtx_extract.c
-#
-#     This tool currently supports RGBA8 (format 0x1A) and DXT5 (format 0x33)
-#     textures.
-#     The former is known to work with 2048x512 textures.
-#     The latter has been tested successfully with 512x320 and 2048x512 textures,
-#     and is known to be broken with 384x256 textures.
-#
-#     Why so complex?
-#     Wii U textures appear to be packed using a complex 'texture swizzling'
-#     algorithm, presumably for faster access.
-#
-#     With no publicly known details that I could find, I had to attempt to
-#     recreate it myself - with a limited set of sample data to examine.
-#
-#     This tool's implementation is sufficient to unpack the textures I wanted,
-#     but it's likely to fail on others.
-#     Feel free to throw a pull request at me if you improve it!
-
-
-# Portions of this code are based on libtxc_dxtn:
-#  (No readme available.)
-#  (Header of txc_fetch_dxtn.c:)
-#     libtxc_dxtn
-#     Version:  1.0
-#
-#     Copyright (C) 2004  Roland Scheidegger   All Rights Reserved.
-#
-#     Permission is hereby granted, free of charge, to any person obtaining a
-#     copy of this software and associated documentation files (the "Software"),
-#     to deal in the Software without restriction, including without limitation
-#     the rights to use, copy, modify, merge, publish, distribute, sublicense,
-#     and/or sell copies of the Software, and to permit persons to whom the
-#     Software is furnished to do so, subject to the following conditions:
-#
-#     The above copyright notice and this permission notice shall be included
-#     in all copies or substantial portions of the Software.
-#
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-#     OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-#     BRIAN PAUL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
-#     AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-#     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-################################################################
-################################################################
-
+"""gtx_extract.py: Decode GTX images."""
 
 import os, struct, sys
 
 from PyQt5 import QtCore, QtGui
 
+__author__ = "AboodXD"
+__copyright__ = "Copyright 2016, AboodXD"
+__credits__ = ["AboodXD", "libdxt", "Treeki",
+                    "Reggie Next! team"]
 
-class GtxFile():
+# ----------\/-Start of libdxtn section-\/---------- #
+def Expand_shit(packedcol):
+    EXP5TO8R = int((((packedcol) >> 8) & 0xf8) | (((packedcol) >> 13) & 0x07))
+    EXP6TO8G = int((((packedcol) >> 3) & 0xfc) | (((packedcol) >>  9) & 0x03))
+    EXP5TO8B = int((((packedcol) << 3) & 0xf8) | (((packedcol) >>  2) & 0x07))
+
+    return EXP5TO8R, EXP6TO8G, EXP5TO8B
+
+def dxt135_decode_imageblock(pixdata, img_block_src, i, j, dxt_type):
+    color0 = pixdata[img_block_src] | (pixdata[img_block_src + 1] << 8)
+    color1 = pixdata[img_block_src + 2] | (pixdata[img_block_src + 3] << 8)
+    bits = (pixdata[img_block_src + 4] | (pixdata[img_block_src + 5] << 8) |
+        (pixdata[img_block_src + 6] << 16) | (pixdata[img_block_src + 7] << 24))
+    # What about big/little endian?
+    bit_pos = 2 * (j * 4 + i)
+    code = (bits >> bit_pos) & 3
+
+    ACOMP = 255
+
+    EXP5TO8R0, EXP6TO8G0, EXP5TO8B0 = Expand_shit(color0)
+    EXP5TO8R1, EXP6TO8G1, EXP5TO8B1 = Expand_shit(color1)
+
+    if code == 0:
+        RCOMP = EXP5TO8R0
+        GCOMP = EXP6TO8G0
+        BCOMP = EXP5TO8B0
+    elif code == 1:
+        RCOMP = EXP5TO8R1
+        GCOMP = EXP6TO8G1
+        BCOMP = EXP5TO8B1
+    elif code == 2:
+        if (dxt_type > 1) or (color0 > color1):
+            RCOMP = (EXP5TO8R0 * 2 + EXP5TO8R1) // 3
+            GCOMP = (EXP6TO8G0 * 2 + EXP6TO8G1) // 3
+            BCOMP = (EXP5TO8B0 * 2 + EXP5TO8B1) // 3
+        else:
+            RCOMP = (EXP5TO8R0 + EXP5TO8R1) // 2
+            GCOMP = (EXP6TO8G0 + EXP6TO8G1) // 2
+            BCOMP = (EXP5TO8B0 + EXP5TO8B1) // 2
+    elif code == 3:
+        if (dxt_type > 1) or (color0 > color1):
+            RCOMP = (EXP5TO8R0 + EXP5TO8R1 * 2) // 3
+            GCOMP = (EXP6TO8G0 + EXP6TO8G1 * 2) // 3
+            BCOMP = (EXP5TO8B0 + EXP5TO8B1 * 2) // 3
+        else:
+            RCOMP = 0
+            GCOMP = 0
+            BCOMP = 0
+            if dxt_type == 1: ACOMP = 0
+    return ACOMP, RCOMP, GCOMP, BCOMP
+
+def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
+
     """
-    A class that contains basic info about a not-yet-decoded GXT file.
-    Based on Wii U GTX Extractor.
+    Extract the (i,j) pixel from pixdata and return it
+    in RCOMP, GCOMP, BCOMP, ACOMP.
     """
-    width, height, padWidth, padHeight, format, dataSize = 0, 0, 0, 0, 0, 0
+
+    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
+    alpha0 = pixdata[blksrc]
+    alpha1 = pixdata[blksrc + 1]
+    # TODO test this!
+    bit_pos = ((j & 3) * 4 + (i & 3)) * 3
+    acodelow = pixdata[blksrc + 2 + bit_pos // 8]
+    acodehigh = pixdata[blksrc + 3 + bit_pos // 8]
+    code = (acodelow >> (bit_pos & 0x07) |
+        (acodehigh << (8 - (bit_pos & 0x07)))) & 0x07
+    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
+
+    if code == 0:
+        ACOMP = alpha0
+    elif code == 1:
+        ACOMP = alpha1
+    elif alpha0 > alpha1:
+        ACOMP = (alpha0 * (8 - code) + (alpha1 * (code - 1))) // 7
+    elif code < 6:
+        ACOMP = (alpha0 * (6 - code) + (alpha1 * (code - 1))) // 5
+    elif code == 6:
+        ACOMP = 0
+    else:
+        ACOMP = 255
+
+    return bytes([BCOMP, GCOMP, RCOMP, ACOMP]) # Best way to swap R and B, nice! :)
+    
+# ----------\/-Start of GTX Extractor section-\/------------- #
+class GTXData():
+    width, height = 0, 0
+    format = 0
+    dataSize = 0
     data = b''
 
-    def padSize(self):
-        """
-        Calculates the padded image size.
-        """
-        self.padWidth = (self.width + 63) & ~63
-        self.padHeight = (self.height + 63) & ~63
+class GTXRawHeader(struct.Struct):
+    def __init__(self):
+        super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
 
+    def data(self, data, idx):
+        (self.magic,
+        self._04, self._08, self._0C, self._10, self._14, self._18, self._1C) = self.unpack_from(data, idx)
 
-class Gfx2HeaderStruct(struct.Struct):
-    """
-    Header struct for Gfx2.
-    Based on Wii U GTX Extractor.
-    """
-    def __init__(self, endianness):
-        super().__init__(endianness + '4s7I')
-    def loadFrom(self, data, idx):
-        (self.magic, self._04, self._08, self._0C,
-        self._10, self._14, self._18, self._1C) = self.unpack_from(data, idx)
+class GTXRawSectionHeader(struct.Struct):
+    def __init__(self):
+        super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
 
+    def data(self, data, idx):
+        (self.magic,
+        self._04, self._08, self._0C, self._10,
+        self.size_,
+        self._18, self._1C) = self.unpack_from(data, idx)
 
-class BLKHeaderStruct(struct.Struct):
-    """
-    Header struct fot the BLK sections.
-    Based on Wii U GTX Extractor.
-    """
-    def __init__(self, endianness):
-        super().__init__(endianness + '4s7I')
-    def loadFrom(self, data, idx):
-        (self.magic, self._04, self._08, self._0C,
-        self._10, self.sectionSize, self._18, self._1C) = self.unpack_from(data, idx)
+class GTXRawTextureInfo(struct.Struct):
+    def __init__(self):
+        super().__init__('>39I') # Totally stolen, thanks Reggie Next team!
 
-
-class RawTexInfoStruct(struct.Struct):
-    """
-    Struct for raw tex info.
-    Based on Wii U GTX Extractor.
-    """
-    def __init__(self, endianness):
-        super().__init__(endianness + '39I')
-    def loadFrom(self, data, idx):
-        (self._0, self.width, self.height, self._C,
-        self._10, self.format_, self._18, self._1C,
+    def data(self, data, idx):
+        (self._00, self.width, self.height, self._0C,
+        self._10, self.formatMaybe, self._18, self._1C,
         self.sizeMaybe, self._24, self._28, self._2C,
         self._30, self._34, self._38, self._3C,
         self._40, self._44, self._48, self._4C,
@@ -144,88 +136,82 @@ class RawTexInfoStruct(struct.Struct):
         self._80, self._84, self._88, self._8C,
         self._90, self._94, self._98) = self.unpack_from(data, idx)
 
+def swapRB(argb):
 
-def loadGTX(input, endianness='>'):
     """
-    Takes in data for a GTX image and returns a GtxFile object.
-    Based on Wii U GTX Extractor.
+    Swaps R and B.
+    Don't ask me why, it's based of Treeki's GTX Extractor.
     """
+
+    return int((argb[2], argb[1], argb[0], argb[3])) # 0 is R, 1 is G, 2 is B, and 3 is A. 0 and 2 must be swapped!
+
+
+def readGTX(f, gtx = GTXData):
     idx = 0
-    width, height, format = 0, 0, 0
-    gtxData = b''
 
-    # Parse the Gfx2 Header
-    headStruct = Gfx2HeaderStruct(endianness)
-    headStruct.loadFrom(input, idx)
-    if headStruct.magic != b'Gfx2':
-        raise ValueError('Wrong file magic!')
-    idx += headStruct.size
+    header = GTXRawHeader()
 
-    # Parse each BLK section
-    blkStruct = BLKHeaderStruct(endianness)
-    rawTexInfoStruct = RawTexInfoStruct(endianness)
-    while idx < len(input):
-        blkStruct.loadFrom(input, idx)
+    # This is kinda bad. Don't really care right now >.>
+    gtx.width = 0
+    gtx.height = 0
+    gtx.data = b''
 
-        if blkStruct.magic != b'BLK{':
-            raise ValueError('Wrong BLK section magic!')
-        idx += blkStruct.size
+    header.data(f, idx)
+    
+    if header.magic != b'Gfx2':
+        sys.exit("Invalid file magic!")
 
-        if blkStruct._10 == 0x0B:
-            # Parse raw texture info
-            rawTexInfoStruct.loadFrom(input, idx)
-            idx += rawTexInfoStruct.size
+    idx += header.size
 
-            width = rawTexInfoStruct.width
-            height = rawTexInfoStruct.height
-            format = rawTexInfoStruct.format_
+    while idx < len(f):
+        section = GTXRawSectionHeader()
+        section.data(f, idx)
 
-        elif blkStruct._10 == 0x0C and len(gtxData) == 0:
-            # Grab raw data
-            dataSize = blkStruct.sectionSize
-            gtxData = input[idx:idx + dataSize]
-            idx += dataSize
+        if section.magic != b'BLK{':
+            sys.exit("Invalid section magic!")
+
+        idx += section.size
+
+        if section._10 == 0x0B:
+            info = GTXRawTextureInfo()
+            info.data(f, idx)
+
+            idx += info.size
+
+            if section.size_ != 0x9C :
+                sys.exit("Invalid section size!")
+
+            gtx.width = info.width
+            gtx.height = info.height
+            gtx.format = info.formatMaybe
+
+        elif section._10 == 0x0C and len(gtx.data) == 0:
+            gtx.dataSize = section.size_
+            gtx.data = f[idx:idx + gtx.dataSize]
+            idx += gtx.dataSize
 
         else:
-            # Ignore.
-            idx += blkStruct.sectionSize
+            idx += section.size_
 
-    # Make a GtxFile object and return it.
-    file = GtxFile()
-    file.width = width
-    file.height = height
-    file.format = format
-    file.dataSize = dataSize
-    file.data = gtxData
-    file.padSize()
-    return file
+    return gtx
 
-
-def renderGTX(gtxObj, noalpha=False):
-    """
-    Renders a GTX object.
-    """
-    if gtxObj.format == 0x1A:
-        return renderRGBA8(gtxObj, noalpha)
-    elif gtxObj.format == 0x33:
-        return renderDXT5(gtxObj, noalpha)
+def writeFile(data):
+    if data.format == 0x1A:
+        return export_RGBA8(data)
+    elif data.format == 0x33:
+        return export_DXT5(data)
     else:
-        raise NotImplementedError('Unknown texture format: ' + hex(gtxObj.format))
+        raise NotImplementedError('Unimplemented texture format: ' + hex(data.format))
 
-
-def renderRGBA8(gtx, noalpha):
-    """
-    Renders a RGBA8 GTX image to a QImage.
-    Based on Wii U GTX Extractor.
-    """
-    # uint32_t pos, x, y;
-    # uint32_t *source, *output;
+def export_RGBA8(gtx):
     pos, x, y = 0, 0, 0
-    output = bytearray(gtx.padWidth * gtx.padHeight * 4)
 
-    for y in range(gtx.padHeight):
-        for x in range(gtx.padWidth):
-            pos = (y & ~15) * gtx.padWidth
+    source = gtx.data
+    output = bytearray(gtx.width * gtx.height * 4)
+
+    for y in range(gtx.height):
+        for x in range(gtx.width):
+            pos = (y & ~15) * gtx.width
             pos ^= (x & 3)
             pos ^= ((x >> 2) & 1) << 3
             pos ^= ((x >> 3) & 1) << 6
@@ -235,33 +221,19 @@ def renderRGBA8(gtx, noalpha):
             pos ^= ((y >> 1) & 7) << 4
             pos ^= (y & 0x10) << 4
             pos ^= (y & 0x20) << 2
-
             toPos = (y * gtx.width + x) * 4
             pos *= 4
             output[toPos:toPos + 4] = swapRB(gtx.data[pos:pos + 4], noalpha)
 
-    img = QtGui.QImage(output, gtx.padWidth, gtx.padHeight, QtGui.QImage.Format_ARGB32)
+    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_ARGB32)
     yield img.copy(0, 0, gtx.width, gtx.height)
 
-
-def swapRB(bgra, noalpha):
-    """
-    Swaps R and B.
-    Based on Wii U GTX Extractor.
-    """
-    return bytes((bgra[2], bgra[1], bgra[0], 255 if noalpha else bgra[3]))
-
-
-def renderDXT5(gtx, noalpha):
-    """
-    Renders a DXT5 GTX image to a QImage.
-    Based on Wii U GTX Extractor.
-    """
+def export_DXT5(gtx):
     idx, x, y = 0, 0, 0
     outValue = 0
-    blobWidth = gtx.padWidth // 4
-    blobHeight = gtx.padHeight // 4
-    work = bytearray(gtx.padWidth * gtx.padHeight)
+    blobWidth = gtx.width // 4
+    blobHeight = gtx.height // 4
+    work = bytearray(gtx.width * gtx.height)
 
     for y in range(blobHeight):
         for x in range(blobWidth):
@@ -282,106 +254,23 @@ def renderDXT5(gtx, noalpha):
             pos *= 16
             work[toPos:toPos + 16] = gtx.data[pos:pos + 16]
 
-    output = bytearray(gtx.padWidth * gtx.padHeight * 4)
+    output = bytearray(gtx.width * gtx.height * 4)
 
-    for y in range(gtx.padHeight):
-        for x in range(gtx.padWidth):
-            outValue = calculateRGBAFromDxt5AtPosition(gtx.padWidth, work, x, y, noalpha)
+    for y in range(gtx.height):
+        for x in range(gtx.width):
+            outValue = fetch_2d_texel_rgba_dxt5(gtx.width, work, x, y)
 
-            outputPos = (y * gtx.padWidth + x) * 4
+            outputPos = (y * gtx.width + x) * 4
             output[outputPos:outputPos + 4] = outValue
 
-    img = QtGui.QImage(output, gtx.padWidth, gtx.padHeight, QtGui.QImage.Format_ARGB32)
+    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_ARGB32)
     yield img.copy(0, 0, gtx.width, gtx.height)
-
-
-def calculateRGBAFromDxt5AtPosition(width, pixdata, i, j, noalpha):
-    """
-    Fetches a RGBA texel from position (i, j) in a DXT5 texture.
-    Based on libtxc_dxtn.
-    """
-    pointer = ((width + 3) // 4 * (j // 4) + (i // 4)) * 16
-    alpha0 = pixdata[pointer]
-    alpha1 = pixdata[pointer + 1]
-
-    bit_pos = ((j & 3) * 4 + (i & 3)) * 3
-    acodelow = pixdata[pointer + 2 + bit_pos // 8]
-    acodehigh = pixdata[pointer + 3 + bit_pos // 8]
-    code = (acodelow >> (bit_pos & 0x07) |
-        (acodehigh << (8 - (bit_pos & 0x07)))) & 0x07
-
-    a, r, g, b = calculateRGBFromDxtAtPosition(pixdata, pointer + 8, i & 3, j & 3, 2)
-
-    if code == 0:
-        a = alpha0
-    elif code == 1:
-        a = alpha1
-    elif alpha0 > alpha1:
-        a = (alpha0 * (8 - code) + (alpha1 * (code - 1))) // 7
-    elif code < 6:
-        a = (alpha0 * (6 - code) + (alpha1 * (code - 1))) // 5
-    elif code == 6:
-        a = 0
-    else:
-        a = 255
-
-    return bytes([b, g, r, 255 if noalpha else a])
-
-
-def calculateRGBFromDxtAtPosition(pixdata, pointer, i, j, dxt_type):
-    """
-    Fetches a RGB texel from position (i, j) in a DXT1, DXT3 or DXT5 texture.
-    Based on libtxc_dxtn.
-    """
-    color0 = pixdata[pointer] | (pixdata[pointer + 1] << 8)
-    color1 = pixdata[pointer + 2] | (pixdata[pointer + 3] << 8)
-    bits = (pixdata[pointer + 4] | (pixdata[pointer + 5] << 8) |
-        (pixdata[pointer + 6] << 16) | (pixdata[pointer + 7] << 24))
-
-    bit_pos = 2 * (j * 4 + i)
-    code = (bits >> bit_pos) & 3
-
-    a = 255
-
-    # Expand r0, b0, r1 and g1 from 5 to 8 bits, and g0 and g1 from 6 to 8 bits.
-    r0Expanded = int((color0 >> 11) * 0xFF / 0x1F)
-    g0Expanded = int(((color0 >> 5) & 0x3F) * 0xFF / 0x3F)
-    b0Expanded = int((color0 & 0x1F) * 0xFF / 0x1F)
-    r1Expanded = int((color1 >> 11) * 0xFF / 0x1F)
-    g1Expanded = int(((color1 >> 5) & 0x3F) * 0xFF / 0x3F)
-    b1Expanded = int((color1 & 0x1F) * 0xFF / 0x1F)
-
-    if code == 0:
-        r = r0Expanded
-        g = g0Expanded
-        b = b0Expanded
-    elif code == 1:
-        r = r1Expanded
-        g = g1Expanded
-        b = b1Expanded
-    elif code == 2:
-        if (dxt_type > 1) or (color0 > color1):
-            r = (r0Expanded * 2 + r1Expanded) // 3
-            g = (g0Expanded * 2 + g1Expanded) // 3
-            b = (b0Expanded * 2 + b1Expanded) // 3
-        else:
-            r = (r0Expanded + r1Expanded) // 2
-            g = (g0Expanded + g1Expanded) // 2
-            b = (b0Expanded + b1Expanded) // 2
-    elif code == 3:
-        if (dxt_type > 1) or (color0 > color1):
-            r = (r0Expanded + r1Expanded * 2) // 3
-            g = (g0Expanded + g1Expanded * 2) // 3
-            b = (b0Expanded + b1Expanded * 2) // 3
-        else:
-            r, g, b = 0, 0, 0
-            if dxt_type == 1: a = 0
-    return a, r, g, b
 
 
 def main():
     """
     This script allows you to run this module as a standalone Python program.
+    Also, this place is a mess...
     """
     app = QtCore.QCoreApplication([])
 
@@ -393,8 +282,18 @@ def main():
         print('Converting: '+sys.argv[1])
         inb = inf.read()
 
+    data = readGTX(inb)
+
+    print('')
+    print("Width: " + str(data.width) + " - Height: " + str(data.height) + " - Format: " + hex(data.format) + " - Size: " + str(data.dataSize))
+
+    data.width = (data.width + 63) & ~63
+    data.height = (data.height + 63) & ~63
+    print("Padded Width: " + str(data.width) + " - Padded Height: " + str(data.height))
+
     name = os.path.splitext(sys.argv[1])[0]
-    for img in renderGTX(loadGTX(inb)):
+
+    for img in writeFile(data):
         img.save(name + ".png")
         print('')
         print('Finished converting: '+sys.argv[1])

@@ -237,7 +237,7 @@ def export_DXT5(gtx):
 
     for y in range(blobHeight):
         for x in range(blobWidth):
-            pos = ((y >> 4) * (blobWidth * 16)) & 0xFFFF
+            pos = (y >> 4) * (blobWidth * 16)
             pos ^= (y & 1)
             pos ^= (x & 7) << 1
             pos ^= (x & 8) << 1

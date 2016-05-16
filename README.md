@@ -4,5 +4,7 @@ format used in Wii U games. A bit of work could get it to extract .bflim files, 
 
 # Credits:
 Treeki - Original GTX Extractor
+
 AboodXD - porting GTX Extractor to python.
+
 Reggie Next! team - Showing me the struct needed to get the file magic, width, height, etc...

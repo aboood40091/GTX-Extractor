@@ -201,7 +201,7 @@ def writeFile(data):
     elif data.format == 0x33:
         return export_DXT5(data)
     else:
-        raise NotImplementedError('Unimplemented texture format: ' + hex(data.format))
+        sys.exit("Unimplemented texture format: " + hex(data.format))
 
 def export_RGBA8(gtx):
     pos, x, y = 0, 0, 0
@@ -223,7 +223,7 @@ def export_RGBA8(gtx):
             pos ^= (y & 0x20) << 2
             toPos = (y * gtx.width + x) * 4
             pos *= 4
-            output[toPos:toPos + 4] = swapRB(gtx.data[pos:pos + 4], noalpha)
+            output[toPos:toPos + 4] = swapRB(gtx.data[pos:pos + 4])
 
     img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_ARGB32)
     yield img.copy(0, 0, gtx.width, gtx.height)

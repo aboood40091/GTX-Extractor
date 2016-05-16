@@ -146,7 +146,7 @@ def swapRB(argb):
     return bytes((argb[2], argb[1], argb[0], argb[3])) # 0 is R, 1 is G, 2 is B, and 3 is A. 0 and 2 must be swapped!
 
 
-def readGTX(f, gtx = GTXData):
+def readGTX(FILE, gtx = GTXData(), f = FILE):
     idx = 0
 
     header = GTXRawHeader()

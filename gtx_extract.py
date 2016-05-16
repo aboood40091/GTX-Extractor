@@ -8,7 +8,7 @@ from PyQt5 import QtCore, QtGui
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2016, AboodXD"
-__credits__ = ["AboodXD", "libdxt", "Treeki",
+__credits__ = ["AboodXD", "libdxtn", "Treeki",
                     "Reggie Next! team"]
 
 # ----------\/-Start of libdxtn section-\/---------- #

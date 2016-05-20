@@ -93,7 +93,7 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
     else:
         ACOMP = 255
 
-    return bytes([BCOMP, GCOMP, RCOMP, ACOMP]) # Best way to swap R and B, nice! :)
+    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
     
 # ----------\/-Start of GTX Extractor section-\/------------- #
 class GTXData():
@@ -135,16 +135,6 @@ class GTXRawTextureInfo(struct.Struct):
         self._70, self._74, self._78, self._7C,
         self._80, self._84, self._88, self._8C,
         self._90, self._94, self._98) = self.unpack_from(data, idx)
-
-def swapRB(argb):
-
-    """
-    Swaps R and B.
-    Don't ask me why, it's based of Treeki's GTX Extractor.
-    """
-
-    return bytes((argb[2], argb[1], argb[0], argb[3])) # 0 is R, 1 is G, 2 is B, and 3 is A. 0 and 2 must be swapped!
-
 
 def readGTX(f, gtx = GTXData()):
     idx = 0
@@ -223,9 +213,9 @@ def export_RGBA8(gtx):
             pos ^= (y & 0x20) << 2
             toPos = (y * gtx.width + x) * 4
             pos *= 4
-            output[toPos:toPos + 4] = swapRB(gtx.data[pos:pos + 4])
+            output[toPos:toPos + 4] = gtx.data[pos:pos + 4]
 
-    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_ARGB32)
+    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gtx.width, gtx.height)
 
 def export_DXT5(gtx):
@@ -263,7 +253,7 @@ def export_DXT5(gtx):
             outputPos = (y * gtx.width + x) * 4
             output[outputPos:outputPos + 4] = outValue
 
-    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_ARGB32)
+    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gtx.width, gtx.height)
 
 

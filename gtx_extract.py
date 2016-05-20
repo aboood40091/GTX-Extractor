@@ -97,34 +97,34 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
     
 # ----------\/-Start of GTX Extractor section-\/------------- #
 class GTXData():
-    width, height = 0, 0
-    format = 0
-    dataSize = 0
-    data = b''
+    self.width, self.height = 0, 0
+    self.format = 0
+    self.dataSize = 0
+    self.data = b''
 
 class GTXRawHeader(struct.Struct):
     def __init__(self):
         super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
 
-    def data(self, data, idx):
+    def data(self, data, pos):
         (self.magic,
-        self._04, self._08, self._0C, self._10, self._14, self._18, self._1C) = self.unpack_from(data, idx)
+        self._04, self._08, self._0C, self._10, self._14, self._18, self._1C) = self.unpack_from(data, pos)
 
 class GTXRawSectionHeader(struct.Struct):
     def __init__(self):
         super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
 
-    def data(self, data, idx):
+    def data(self, data, pos):
         (self.magic,
         self._04, self._08, self._0C, self._10,
         self.size_,
-        self._18, self._1C) = self.unpack_from(data, idx)
+        self._18, self._1C) = self.unpack_from(data, pos)
 
 class GTXRawTextureInfo(struct.Struct):
     def __init__(self):
         super().__init__('>39I') # Totally stolen, thanks Reggie Next team!
 
-    def data(self, data, idx):
+    def data(self, data, pos):
         (self._00, self.width, self.height, self._0C,
         self._10, self.formatMaybe, self._18, self._1C,
         self.sizeMaybe, self._24, self._28, self._2C,
@@ -134,10 +134,11 @@ class GTXRawTextureInfo(struct.Struct):
         self._60, self._64, self._68, self._6C,
         self._70, self._74, self._78, self._7C,
         self._80, self._84, self._88, self._8C,
-        self._90, self._94, self._98) = self.unpack_from(data, idx)
+        self._90, self._94, self._98) = self.unpack_from(data, pos)
 
-def readGTX(f, gtx = GTXData()):
-    idx = 0
+def readGTX(f):
+    gtx = GTXData()
+    pos = 0
 
     header = GTXRawHeader()
 
@@ -146,27 +147,27 @@ def readGTX(f, gtx = GTXData()):
     gtx.height = 0
     gtx.data = b''
 
-    header.data(f, idx)
+    header.data(f, pos)
     
     if header.magic != b'Gfx2':
         sys.exit("Invalid file magic!")
 
-    idx += header.size
+    pos += header.size
 
-    while idx < len(f):
+    while pos < len(f):
         section = GTXRawSectionHeader()
-        section.data(f, idx)
+        section.data(f, pos)
 
         if section.magic != b'BLK{':
             sys.exit("Invalid section magic!")
 
-        idx += section.size
+        pos += section.size
 
         if section._10 == 0x0B:
             info = GTXRawTextureInfo()
-            info.data(f, idx)
+            info.data(f, pos)
 
-            idx += info.size
+            pos += info.size
 
             if section.size_ != 0x9C :
                 sys.exit("Invalid section size!")
@@ -177,11 +178,11 @@ def readGTX(f, gtx = GTXData()):
 
         elif section._10 == 0x0C and len(gtx.data) == 0:
             gtx.dataSize = section.size_
-            gtx.data = f[idx:idx + gtx.dataSize]
-            idx += gtx.dataSize
+            gtx.data = f[pos:pos + gtx.dataSize]
+            pos += gtx.dataSize
 
         else:
-            idx += section.size_
+            pos += section.size_
 
     return gtx
 
@@ -194,6 +195,9 @@ def writeFile(data):
         sys.exit("Unimplemented texture format: " + hex(data.format))
 
 def export_RGBA8(gtx):
+    gtx.width = (gtx.width + 63) & ~63
+    gtx.height = (gtx.height + 63) & ~63
+
     pos, x, y = 0, 0, 0
 
     source = gtx.data
@@ -219,7 +223,10 @@ def export_RGBA8(gtx):
     yield img.copy(0, 0, gtx.width, gtx.height)
 
 def export_DXT5(gtx):
-    idx, x, y = 0, 0, 0
+    gtx.width = (gtx.width + 63) & ~63
+    gtx.height = (gtx.height + 63) & ~63
+
+    pos, x, y = 0, 0, 0
     outValue = 0
     blobWidth = gtx.width // 4
     blobHeight = gtx.height // 4

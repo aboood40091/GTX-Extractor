@@ -96,11 +96,11 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
     return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
     
 # ----------\/-Start of GTX Extractor section-\/------------- #
-def GTXData(self):
-    self.width, self.height = 0, 0
-    self.format = 0
-    self.dataSize = 0
-    self.data = b''
+class GTXData():
+    width, height = 0, 0
+    format = 0
+    dataSize = 0
+    data = b''
 
 class GTXRawHeader(struct.Struct):
     def __init__(self):

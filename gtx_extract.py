@@ -96,12 +96,11 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
     return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
     
 # ----------\/-Start of GTX Extractor section-\/------------- #
-class GTXData():
-    def __init__(self):
-        self.width, self.height = 0, 0
-        self.format = 0
-        self.dataSize = 0
-        self.data = b''
+def GTXData(self):
+    self.width, self.height = 0, 0
+    self.format = 0
+    self.dataSize = 0
+    self.data = b''
 
 class GTXRawHeader(struct.Struct):
     def __init__(self):
@@ -196,17 +195,17 @@ def writeFile(data):
         sys.exit("Unimplemented texture format: " + hex(data.format))
 
 def export_RGBA8(gtx):
-    gtx.width = (gtx.width + 63) & ~63
-    gtx.height = (gtx.height + 63) & ~63
+    gtx.width_ = (gtx.width + 63) & ~63
+    gtx.height_ = (gtx.height + 63) & ~63
 
     pos, x, y = 0, 0, 0
 
     source = gtx.data
-    output = bytearray(gtx.width * gtx.height * 4)
+    output = bytearray(gtx.width_ * gtx.height_ * 4)
 
-    for y in range(gtx.height):
-        for x in range(gtx.width):
-            pos = (y & ~15) * gtx.width
+    for y in range(gtx.height_):
+        for x in range(gtx.width_):
+            pos = (y & ~15) * gtx.width_
             pos ^= (x & 3)
             pos ^= ((x >> 2) & 1) << 3
             pos ^= ((x >> 3) & 1) << 6
@@ -216,22 +215,22 @@ def export_RGBA8(gtx):
             pos ^= ((y >> 1) & 7) << 4
             pos ^= (y & 0x10) << 4
             pos ^= (y & 0x20) << 2
-            toPos = (y * gtx.width + x) * 4
+            pos_ = (y * gtx.width_ + x) * 4
             pos *= 4
-            output[toPos:toPos + 4] = gtx.data[pos:pos + 4]
+            output[pos_:pos_ + 4] = gtx.data[pos:pos + 4]
 
-    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_RGBA8888)
+    img = QtGui.QImage(output, gtx.width_, gtx.height_, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gtx.width, gtx.height)
 
 def export_DXT5(gtx):
-    gtx.width = (gtx.width + 63) & ~63
-    gtx.height = (gtx.height + 63) & ~63
+    gtx.width_ = (gtx.width + 63) & ~63
+    gtx.height_ = (gtx.height + 63) & ~63
 
     pos, x, y = 0, 0, 0
     outValue = 0
-    blobWidth = gtx.width // 4
-    blobHeight = gtx.height // 4
-    work = bytearray(gtx.width * gtx.height)
+    blobWidth = gtx.width_ // 4
+    blobHeight = gtx.height_ // 4
+    work = bytearray(gtx.width_ * gtx.height_)
 
     for y in range(blobHeight):
         for x in range(blobWidth):
@@ -248,52 +247,50 @@ def export_DXT5(gtx):
             pos ^= (y & 0x10) << 2
             pos ^= (y & 0x20)
 
-            toPos = (y * blobWidth + x) * 16
+            pos_ = (y * blobWidth + x) * 16
             pos *= 16
-            work[toPos:toPos + 16] = gtx.data[pos:pos + 16]
+            work[pos_:pos_ + 16] = gtx.data[pos:pos + 16]
 
-    output = bytearray(gtx.width * gtx.height * 4)
+    output = bytearray(gtx.width_ * gtx.height_ * 4)
 
-    for y in range(gtx.height):
-        for x in range(gtx.width):
-            outValue = fetch_2d_texel_rgba_dxt5(gtx.width, work, x, y)
+    for y in range(gtx.height_):
+        for x in range(gtx.width_):
+            outValue = fetch_2d_texel_rgba_dxt5(gtx.width_, work, x, y)
 
-            outputPos = (y * gtx.width + x) * 4
-            output[outputPos:outputPos + 4] = outValue
+            pos__ = (y * gtx.width_ + x) * 4
+            output[pos__:pos__ + 4] = outValue
 
-    img = QtGui.QImage(output, gtx.width, gtx.height, QtGui.QImage.Format_RGBA8888)
+    img = QtGui.QImage(output, gtx.width_, gtx.height_, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gtx.width, gtx.height)
 
 
 def main():
     """
-    This script allows you to run this module as a standalone Python program.
-    Also, this place is a mess...
+    This place is a mess...
     """
-    app = QtCore.QCoreApplication([])
-
     if len(sys.argv) != 2:
         print("Usage: gtx_extract.py input.gtx")
         sys.exit(1)
     
     with open(sys.argv[1], "rb") as inf:
-        print('Converting: '+sys.argv[1])
+        print('Converting: ' + sys.argv[1])
         inb = inf.read()
+        inf.close()
 
     data = readGTX(inb)
 
     print('')
     print("Width: " + str(data.width) + " - Height: " + str(data.height) + " - Format: " + hex(data.format) + " - Size: " + str(data.dataSize))
 
-    data.width = (data.width + 63) & ~63
-    data.height = (data.height + 63) & ~63
-    print("Padded Width: " + str(data.width) + " - Padded Height: " + str(data.height))
+    data.width_ = (data.width + 63) & ~63
+    data.height_ = (data.height + 63) & ~63
+    print("Padded Width: " + str(data.width_) + " - Padded Height: " + str(data.height_))
 
     name = os.path.splitext(sys.argv[1])[0]
 
     for img in writeFile(data):
         img.save(name + ".png")
         print('')
-        print('Finished converting: '+sys.argv[1])
+        print('Finished converting: ' + sys.argv[1])
 
 if __name__ == '__main__': main()

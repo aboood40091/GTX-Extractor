@@ -102,45 +102,40 @@ class GTXData():
     dataSize = 0
     data = b''
 
-class GTXRawHeader(struct.Struct):
+class GFDHeader(struct.Struct):
     def __init__(self):
         super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
 
     def data(self, data, pos):
         (self.magic,
-        self._04, self._08, self._0C, self._10, self._14, self._18, self._1C) = self.unpack_from(data, pos)
+        self.size, self.majorVersion, self.minorVersion, self.gpuVersion, self.alignMode, self.reserved1, self.reserved2) = self.unpack_from(data, pos)
 
-class GTXRawSectionHeader(struct.Struct):
+class GFDBlockHeader(struct.Struct):
     def __init__(self):
         super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
 
     def data(self, data, pos):
         (self.magic,
-        self._04, self._08, self._0C, self._10,
-        self.size_,
-        self._18, self._1C) = self.unpack_from(data, pos)
+        self.size, self.majorVersion, self.minorVersion, self.type,
+        self.dataSize,
+        self.id, self.typeIdx) = self.unpack_from(data, pos)
 
-class GTXRawTextureInfo(struct.Struct):
+class GFDSurface(struct.Struct):
     def __init__(self):
         super().__init__('>39I') # Totally stolen, thanks Reggie Next team!
 
     def data(self, data, pos):
-        (self._00, self.width, self.height, self._0C,
-        self._10, self.formatMaybe, self._18, self._1C,
-        self.sizeMaybe, self._24, self._28, self._2C,
-        self._30, self._34, self._38, self._3C,
-        self._40, self._44, self._48, self._4C,
-        self._50, self._54, self._58, self._5C,
-        self._60, self._64, self._68, self._6C,
-        self._70, self._74, self._78, self._7C,
-        self._80, self._84, self._88, self._8C,
-        self._90, self._94, self._98) = self.unpack_from(data, pos)
+        (self.dim, self.width, self.height, self.depth,
+        self.numMips, self.format, self.aa, self.use,
+        self.imageSize, self.imagePtr, self.mipSize, self.mipPtr,
+        self.tileMode, self.swizzle, self.alignment, self.pitch,
+        self.mipOffset) = self.unpack_from(data, pos)
 
 def readGTX(f):
     gtx = GTXData()
     pos = 0
 
-    header = GTXRawHeader()
+    header = GFDHeader()
 
     # This is kinda bad. Don't really care right now >.>
     gtx.width = 0
@@ -155,7 +150,7 @@ def readGTX(f):
     pos += header.size
 
     while pos < len(f):
-        section = GTXRawSectionHeader()
+        section = GFDBlockHeader()
         section.data(f, pos)
 
         if section.magic != b'BLK{':
@@ -163,26 +158,26 @@ def readGTX(f):
 
         pos += section.size
 
-        if section._10 == 0x0B:
-            info = GTXRawTextureInfo()
+        if section.type == 0x0B:
+            info = GFDSurface()
             info.data(f, pos)
 
             pos += info.size
 
-            if section.size_ != 0x9C :
+            if section.dataSize != 0x9C :
                 sys.exit("Invalid section size!")
 
             gtx.width = info.width
             gtx.height = info.height
-            gtx.format = info.formatMaybe
+            gtx.format = info.format
 
-        elif section._10 == 0x0C and len(gtx.data) == 0:
-            gtx.dataSize = section.size_
-            gtx.data = f[pos:pos + gtx.dataSize]
-            pos += gtx.dataSize
+        elif section.type == 0x0C and len(gtx.data) == 0:
+            gtx.dataSize = section.dataSize
+            gtx.data = f[pos:pos + section.dataSize]
+            pos += section.dataSize
 
         else:
-            pos += section.size_
+            pos += section.dataSize
 
     return gtx
 

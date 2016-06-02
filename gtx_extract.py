@@ -167,7 +167,7 @@ def readGFD(f):
     header.data(f, pos)
     
     if header.magic != b'Gfx2':
-        sys.exit("Invalid file header!")
+        raise ValueError("Invalid file header!")
 
     pos += header.size
 

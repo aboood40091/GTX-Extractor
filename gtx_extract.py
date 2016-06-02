@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""gtx_extract.py: Decode GTX images."""
+"""gtx_extract.py: Decode GFD/GTX/GSH images."""
 
 import os, struct, sys
 
@@ -95,8 +95,8 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
 
     return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
     
-# ----------\/-Start of GTX Extractor section-\/------------- #
-class GTXData():
+# ----------\/-Start of GFD Extractor section-\/------------- #
+class GFDData():
     width, height = 0, 0
     format = 0
     dataSize = 0
@@ -108,7 +108,13 @@ class GFDHeader(struct.Struct):
 
     def data(self, data, pos):
         (self.magic,
-        self.size, self.majorVersion, self.minorVersion, self.gpuVersion, self.alignMode, self.reserved1, self.reserved2) = self.unpack_from(data, pos)
+        self.size,
+        self.majorVersion,
+        self.minorVersion,
+        self.gpuVersion,
+        self.alignMode,
+        self.reserved1,
+        self.reserved2) = self.unpack_from(data, pos)
 
 class GFDBlockHeader(struct.Struct):
     def __init__(self):
@@ -116,91 +122,106 @@ class GFDBlockHeader(struct.Struct):
 
     def data(self, data, pos):
         (self.magic,
-        self.size, self.majorVersion, self.minorVersion, self.type,
+        self.size,
+        self.majorVersion,
+        self.minorVersion,
+        self.type,
         self.dataSize,
-        self.id, self.typeIdx) = self.unpack_from(data, pos)
+        self.id,
+        self.typeIdx) = self.unpack_from(data, pos)
 
 class GFDSurface(struct.Struct):
     def __init__(self):
         super().__init__('>39I') # Totally stolen, thanks Reggie Next team!
 
     def data(self, data, pos):
-        (self.dim, self.width, self.height, self.depth,
-        self.numMips, self.format, self.aa, self.use,
-        self.imageSize, self.imagePtr, self.mipSize, self.mipPtr,
-        self.tileMode, self.swizzle, self.alignment, self.pitch,
+        (self.dim,
+        self.width,
+        self.height,
+        self.depth,
+        self.numMips,
+        self.format,
+        self.aa,
+        self.use,
+        self.imageSize,
+        self.imagePtr,
+        self.mipSize,
+        self.mipPtr,
+        self.tileMode,
+        self.swizzle,
+        self.alignment,
+        self.pitch,
         self.mipOffset) = self.unpack_from(data, pos)
 
-def readGTX(f):
-    gtx = GTXData()
+def readGFD(f):
+    gfd = GFDData()
     pos = 0
 
     header = GFDHeader()
 
     # This is kinda bad. Don't really care right now >.>
-    gtx.width = 0
-    gtx.height = 0
-    gtx.data = b''
+    gfd.width = 0
+    gfd.height = 0
+    gfd.data = b''
 
     header.data(f, pos)
     
     if header.magic != b'Gfx2':
-        sys.exit("Invalid file magic!")
+        sys.exit("Invalid file header!")
 
     pos += header.size
 
     while pos < len(f):
-        section = GFDBlockHeader()
-        section.data(f, pos)
+        block = GFDBlockHeader()
+        block.data(f, pos)
 
-        if section.magic != b'BLK{':
-            sys.exit("Invalid section magic!")
+        if block.magic != b'BLK{':
+            raise ValueError("Invalid block header!")
 
-        pos += section.size
+        pos += block.size
 
-        if section.type == 0x0B:
-            info = GFDSurface()
-            info.data(f, pos)
+        if block.type == 0x0B:
+            surface = GFDSurface()
+            surface.data(f, pos)
 
-            pos += info.size
+            pos += surface.size
 
-            if section.dataSize != 0x9C :
-                sys.exit("Invalid section size!")
+            if block.dataSize != 0x9C :
+                raise ValueError("Invalid data block size!")
 
-            gtx.width = info.width
-            gtx.height = info.height
-            gtx.format = info.format
+            gfd.width = surface.width
+            gfd.height = surface.height
+            gfd.format = surface.format
 
-        elif section.type == 0x0C and len(gtx.data) == 0:
-            gtx.dataSize = section.dataSize
-            gtx.data = f[pos:pos + section.dataSize]
-            pos += section.dataSize
+        elif block.type == 0x0C and len(gfd.data) == 0:
+            gfd.dataSize = block.dataSize
+            gfd.data = f[pos:pos + block.dataSize]
+            pos += block.dataSize
 
         else:
-            pos += section.dataSize
+            pos += block.dataSize
 
-    return gtx
+    return gfd
 
 def writeFile(data):
-    if data.format == 0x1A:
+    if data.format == 0x00:
+        raise ValueError("Invalid format!")
+    elif data.format == 0x1A:
         return export_RGBA8(data)
     elif data.format == 0x33:
         return export_DXT5(data)
     else:
-        sys.exit("Unimplemented texture format: " + hex(data.format))
+        raise UnimplementedError("Unimplemented texture format: " + hex(data.format))
 
-def export_RGBA8(gtx):
-    gtx.width_ = (gtx.width + 63) & ~63
-    gtx.height_ = (gtx.height + 63) & ~63
-
+def export_RGBA8(gfd):
     pos, x, y = 0, 0, 0
 
-    source = gtx.data
-    output = bytearray(gtx.width_ * gtx.height_ * 4)
+    source = gfd.data
+    output = bytearray(gfd.width_ * gfd.height_ * 4)
 
-    for y in range(gtx.height_):
-        for x in range(gtx.width_):
-            pos = (y & ~15) * gtx.width_
+    for y in range(gfd.height_):
+        for x in range(gfd.width_):
+            pos = (y & ~15) * gfd.width_
             pos ^= (x & 3)
             pos ^= ((x >> 2) & 1) << 3
             pos ^= ((x >> 3) & 1) << 6
@@ -210,22 +231,19 @@ def export_RGBA8(gtx):
             pos ^= ((y >> 1) & 7) << 4
             pos ^= (y & 0x10) << 4
             pos ^= (y & 0x20) << 2
-            pos_ = (y * gtx.width_ + x) * 4
+            pos_ = (y * gfd.width_ + x) * 4
             pos *= 4
-            output[pos_:pos_ + 4] = gtx.data[pos:pos + 4]
+            output[pos_:pos_ + 4] = gfd.data[pos:pos + 4]
 
-    img = QtGui.QImage(output, gtx.width_, gtx.height_, QtGui.QImage.Format_RGBA8888)
-    yield img.copy(0, 0, gtx.width, gtx.height)
+    img = QtGui.QImage(output, gfd.width_, gfd.height_, QtGui.QImage.Format_RGBA8888)
+    yield img.copy(0, 0, gfd.width, gfd.height)
 
-def export_DXT5(gtx):
-    gtx.width_ = (gtx.width + 63) & ~63
-    gtx.height_ = (gtx.height + 63) & ~63
-
+def export_DXT5(gfd):
     pos, x, y = 0, 0, 0
     outValue = 0
-    blobWidth = gtx.width_ // 4
-    blobHeight = gtx.height_ // 4
-    work = bytearray(gtx.width_ * gtx.height_)
+    blobWidth = gfd.width_ // 4
+    blobHeight = gfd.height_ // 4
+    work = bytearray(gfd.width_ * gfd.height_)
 
     for y in range(blobHeight):
         for x in range(blobWidth):
@@ -244,19 +262,19 @@ def export_DXT5(gtx):
 
             pos_ = (y * blobWidth + x) * 16
             pos *= 16
-            work[pos_:pos_ + 16] = gtx.data[pos:pos + 16]
+            work[pos_:pos_ + 16] = gfd.data[pos:pos + 16]
 
-    output = bytearray(gtx.width_ * gtx.height_ * 4)
+    output = bytearray(gfd.width_ * gfd.height_ * 4)
 
-    for y in range(gtx.height_):
-        for x in range(gtx.width_):
-            outValue = fetch_2d_texel_rgba_dxt5(gtx.width_, work, x, y)
+    for y in range(gfd.height_):
+        for x in range(gfd.width_):
+            outValue = fetch_2d_texel_rgba_dxt5(gfd.width_, work, x, y)
 
-            pos__ = (y * gtx.width_ + x) * 4
+            pos__ = (y * gfd.width_ + x) * 4
             output[pos__:pos__ + 4] = outValue
 
-    img = QtGui.QImage(output, gtx.width_, gtx.height_, QtGui.QImage.Format_RGBA8888)
-    yield img.copy(0, 0, gtx.width, gtx.height)
+    img = QtGui.QImage(output, gfd.width_, gfd.height_, QtGui.QImage.Format_RGBA8888)
+    yield img.copy(0, 0, gfd.width, gfd.height)
 
 
 def main():
@@ -264,7 +282,7 @@ def main():
     This place is a mess...
     """
     if len(sys.argv) != 2:
-        print("Usage: gtx_extract.py input.gtx")
+        print("Usage: gtx_extract.py input")
         sys.exit(1)
     
     with open(sys.argv[1], "rb") as inf:
@@ -272,7 +290,7 @@ def main():
         inb = inf.read()
         inf.close()
 
-    data = readGTX(inb)
+    data = readGFD(inb)
 
     print('')
     print("Width: " + str(data.width) + " - Height: " + str(data.height) + " - Format: " + hex(data.format) + " - Size: " + str(data.dataSize))

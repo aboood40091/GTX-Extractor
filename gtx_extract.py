@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""gtx_extract.py: Decode GFD/GTX/GSH images."""
+"""gtx_extract.py: Decode GFD (GTX/GSH) images."""
 
 import os, struct, sys
 
@@ -108,7 +108,7 @@ class GFDHeader(struct.Struct):
 
     def data(self, data, pos):
         (self.magic,
-        self.size,
+        self.size_,
         self.majorVersion,
         self.minorVersion,
         self.gpuVersion,
@@ -122,10 +122,10 @@ class GFDBlockHeader(struct.Struct):
 
     def data(self, data, pos):
         (self.magic,
-        self.size,
+        self.size_,
         self.majorVersion,
         self.minorVersion,
-        self.type,
+        self.type_,
         self.dataSize,
         self.id,
         self.typeIdx) = self.unpack_from(data, pos)
@@ -140,7 +140,7 @@ class GFDSurface(struct.Struct):
         self.height,
         self.depth,
         self.numMips,
-        self.format,
+        self.format_,
         self.aa,
         self.use,
         self.imageSize,
@@ -151,7 +151,29 @@ class GFDSurface(struct.Struct):
         self.swizzle,
         self.alignment,
         self.pitch,
-        self.mipOffset) = self.unpack_from(data, pos)
+        self.mipOffset,
+        self._44,
+        self._48,
+        self._4C,
+        self._50,
+        self._54,
+        self._58,
+        self._5C,
+        self._60,
+        self._64,
+        self._68,
+        self._6C,
+        self._70,
+        self._74,
+        self._78,
+        self._7C,
+        self._80,
+        self._84,
+        self._88,
+        self._8C,
+        self._90,
+        self._94,
+        self._98) = self.unpack_from(data, pos)
 
 def readGFD(f):
     gfd = GFDData()
@@ -180,7 +202,7 @@ def readGFD(f):
 
         pos += block.size
 
-        if block.type == 0x0B:
+        if block.type_ == 0x0B:
             surface = GFDSurface()
             surface.data(f, pos)
 
@@ -189,11 +211,24 @@ def readGFD(f):
             if block.dataSize != 0x9C :
                 raise ValueError("Invalid data block size!")
 
+            gfd.dim = surface.dim
             gfd.width = surface.width
             gfd.height = surface.height
-            gfd.format = surface.format
+            gfd.depth = surface.depth
+            gfd.numMips = surface.numMips
+            gfd.format = surface.format_
+            gfd.aa = surface.aa
+            gfd.use = surface.use
+            gfd.imageSize = surface.imageSize
+            gfd.imagePtr = surface.imagePtr
+            gfd.mipSize = surface.mipSize
+            gfd.mipPtr = surface.mipPtr
+            gfd.tileMode = surface.tileMode
+            gfd.swizzle = surface.swizzle
+            gfd.alignment = surface.alignment
+            gfd.pitch = surface.pitch
 
-        elif block.type == 0x0C and len(gfd.data) == 0:
+        elif block.type_ == 0x0C and len(gfd.data) == 0:
             gfd.dataSize = block.dataSize
             gfd.data = f[pos:pos + block.dataSize]
             pos += block.dataSize
@@ -206,9 +241,9 @@ def readGFD(f):
 def writeFile(data):
     if data.format == 0x00:
         raise ValueError("Invalid format!")
-    elif data.format == 0x1A:
+    elif data.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
         return export_RGBA8(data)
-    elif data.format == 0x33:
+    elif data.format == "GX2_SURFACE_FORMAT_T_BC5_UNORM":
         return export_DXT5(data)
     else:
         raise UnimplementedError("Unimplemented texture format: " + hex(data.format))
@@ -217,11 +252,11 @@ def export_RGBA8(gfd):
     pos, x, y = 0, 0, 0
 
     source = gfd.data
-    output = bytearray(gfd.width_ * gfd.height_ * 4)
+    output = bytearray(gfd.width * gfd.height * 4)
 
-    for y in range(gfd.height_):
-        for x in range(gfd.width_):
-            pos = (y & ~15) * gfd.width_
+    for y in range(gfd.height):
+        for x in range(gfd.width):
+            pos = (y & ~15) * gfd.width
             pos ^= (x & 3)
             pos ^= ((x >> 2) & 1) << 3
             pos ^= ((x >> 3) & 1) << 6
@@ -231,19 +266,19 @@ def export_RGBA8(gfd):
             pos ^= ((y >> 1) & 7) << 4
             pos ^= (y & 0x10) << 4
             pos ^= (y & 0x20) << 2
-            pos_ = (y * gfd.width_ + x) * 4
+            pos_ = (y * gfd.width + x) * 4
             pos *= 4
             output[pos_:pos_ + 4] = gfd.data[pos:pos + 4]
 
-    img = QtGui.QImage(output, gfd.width_, gfd.height_, QtGui.QImage.Format_RGBA8888)
+    img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gfd.width, gfd.height)
 
 def export_DXT5(gfd):
     pos, x, y = 0, 0, 0
     outValue = 0
-    blobWidth = gfd.width_ // 4
-    blobHeight = gfd.height_ // 4
-    work = bytearray(gfd.width_ * gfd.height_)
+    blobWidth = gfd.width // 4
+    blobHeight = gfd.height // 4
+    work = bytearray(gfd.width * gfd.height)
 
     for y in range(blobHeight):
         for x in range(blobWidth):
@@ -264,16 +299,16 @@ def export_DXT5(gfd):
             pos *= 16
             work[pos_:pos_ + 16] = gfd.data[pos:pos + 16]
 
-    output = bytearray(gfd.width_ * gfd.height_ * 4)
+    output = bytearray(gfd.width * gfd.height * 4)
 
-    for y in range(gfd.height_):
-        for x in range(gfd.width_):
-            outValue = fetch_2d_texel_rgba_dxt5(gfd.width_, work, x, y)
+    for y in range(gfd.height):
+        for x in range(gfd.width):
+            outValue = fetch_2d_texel_rgba_dxt5(gfd.width, work, x, y)
 
-            pos__ = (y * gfd.width_ + x) * 4
+            pos__ = (y * gfd.width + x) * 4
             output[pos__:pos__ + 4] = outValue
 
-    img = QtGui.QImage(output, gfd.width_, gfd.height_, QtGui.QImage.Format_RGBA8888)
+    img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gfd.width, gfd.height)
 
 
@@ -292,13 +327,30 @@ def main():
 
     data = readGFD(inb)
 
-    print('')
-    print("Width: " + str(data.width) + " - Height: " + str(data.height) + " - Format: " + hex(data.format) + " - Size: " + str(data.dataSize))
+    if data.format == 0x1A:
+        data.format = "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM"
+    elif data.format == 0x33:
+        data.format = "GX2_SURFACE_FORMAT_T_BC5_UNORM"
 
-    data.width_ = (data.width + 63) & ~63
-    data.height_ = (data.height + 63) & ~63
-    print("Padded Width: " + str(data.width_) + " - Padded Height: " + str(data.height_))
-
+    print("")
+    print("// ----- GX2Surface Info ----- ")
+    #print("  index     = " + str(0))
+    print("  dim       = " + str(data.dim))
+    print("  width     = " + str(data.width))
+    print("  height    = " + str(data.height))
+    print("  depth     = " + str(data.depth))
+    print("  numMips   = " + str(data.numMips))
+    print("  format    = " + data.format)
+    print("  aa        = " + str(data.aa))
+    print("  use       = " + str(data.use))
+    print("  imageSize = " + str(data.imageSize))
+    print("  mipSize   = " + str(data.mipSize))
+    print("  tileMode  = " + str(data.tileMode))
+    print("  swizzle   = " + str(data.swizzle) + ", " + hex(data.swizzle))
+    print("  alignment = " + str(data.alignment))
+    print("  pitch     = " + str(data.pitch))
+    #print("  mipOffset = " + str(data.mipOffset))
+    
     name = os.path.splitext(sys.argv[1])[0]
 
     for img in writeFile(data):

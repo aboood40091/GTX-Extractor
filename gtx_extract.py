@@ -1,5 +1,24 @@
 #!/usr/bin/env python
 
+# GTX Extractor
+# Version v1.2a
+# Copyright © 2014 Treeki, 2015-2016 AboodXD
+
+# This file is part of GTX Extractor.
+
+# GTX Extractor is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# GTX Extractor is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 """gtx_extract.py: Decode GFD (GTX/GSH) images."""
 
 import os, struct, sys
@@ -7,7 +26,7 @@ import os, struct, sys
 from PyQt5 import QtCore, QtGui
 
 __author__ = "AboodXD"
-__copyright__ = "Copyright 2016, AboodXD"
+__copyright__ = "Copyright 2015, 2016 AboodXD"
 __credits__ = ["AboodXD", "libdxtn", "Treeki",
                     "Reggie Next! team"]
 

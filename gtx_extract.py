@@ -265,7 +265,7 @@ def writeFile(data):
     elif data.format == "GX2_SURFACE_FORMAT_T_BC5_UNORM":
         return export_DXT5(data)
     else:
-        raise UnimplementedError("Unimplemented texture format: " + hex(data.format))
+        raise NotImplementedError("Unimplemented texture format: " + hex(data.format))
 
 def export_RGBA8(gfd):
     pos, x, y = 0, 0, 0

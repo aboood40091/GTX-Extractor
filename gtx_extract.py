@@ -227,7 +227,7 @@ def readGFD(f):
 
             pos += surface.size
 
-            if block.dataSize != 0x9C :
+            if block.dataSize != 0x9C:
                 raise ValueError("Invalid data block size!")
 
             gfd.dim = surface.dim

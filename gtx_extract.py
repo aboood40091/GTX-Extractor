@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 
 # GTX Extractor
+<<<<<<< HEAD
 # Version v1.2c
+=======
+# Version v1.2b
+>>>>>>> origin/master
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -265,11 +269,15 @@ def writeFile(data):
     elif data.format == "GX2_SURFACE_FORMAT_T_BC5_UNORM":
         return export_DXT5(data)
     else:
+<<<<<<< HEAD
         print("")
         print("Unimplemented texture format: " + hex(data.format))
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
+=======
+        raise NotImplementedError("Unimplemented texture format: " + hex(data.format))
+>>>>>>> origin/master
 
 def export_RGBA8(gfd):
     pos, x, y = 0, 0, 0
@@ -367,7 +375,11 @@ def main():
     try:
         print("  format    = " + data.format)
     except:
+<<<<<<< HEAD
         print("  format    = " + str(data.format))
+=======
+        print("  format    = " + str(data.format)
+>>>>>>> origin/master
     print("  aa        = " + str(data.aa))
     print("  use       = " + str(data.use))
     print("  imageSize = " + str(data.imageSize))

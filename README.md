@@ -6,6 +6,6 @@ A bit of work could get it to extract .bflim files, too.
 # Credits:
 Treeki - Original GTX Extractor
 
-AboodXD - porting GTX Extractor to python.
+AboodXD - porting GTX Extractor to python, adding new stuff.
 
 Reggie Next! team - Showing me the struct needed to get the file magic, width, height, etc...

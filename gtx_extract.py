@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v1.2a
+# Version v1.2c
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -21,7 +21,7 @@
 
 """gtx_extract.py: Decode GFD (GTX/GSH) images."""
 
-import os, struct, sys
+import os, struct, sys, time
 
 from PyQt5 import QtCore, QtGui
 
@@ -227,7 +227,7 @@ def readGFD(f):
 
             pos += surface.size
 
-            if block.dataSize != 0x9C :
+            if block.dataSize != 0x9C:
                 raise ValueError("Invalid data block size!")
 
             gfd.dim = surface.dim
@@ -265,7 +265,11 @@ def writeFile(data):
     elif data.format == "GX2_SURFACE_FORMAT_T_BC5_UNORM":
         return export_DXT5(data)
     else:
-        raise UnimplementedError("Unimplemented texture format: " + hex(data.format))
+        print("")
+        print("Unimplemented texture format: " + hex(data.format))
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
 def export_RGBA8(gfd):
     pos, x, y = 0, 0, 0
@@ -336,7 +340,8 @@ def main():
     This place is a mess...
     """
     if len(sys.argv) != 2:
-        print("Usage: gtx_extract.py input")
+        print("Usage (If using source code): python gtx_extract.py input")
+        print("Usage (If using exe): gtx_extract.exe input")
         sys.exit(1)
     
     with open(sys.argv[1], "rb") as inf:
@@ -359,7 +364,10 @@ def main():
     print("  height    = " + str(data.height))
     print("  depth     = " + str(data.depth))
     print("  numMips   = " + str(data.numMips))
-    print("  format    = " + data.format)
+    try:
+        print("  format    = " + data.format)
+    except:
+        print("  format    = " + str(data.format))
     print("  aa        = " + str(data.aa))
     print("  use       = " + str(data.use))
     print("  imageSize = " + str(data.imageSize))

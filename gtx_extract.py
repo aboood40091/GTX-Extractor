@@ -359,7 +359,10 @@ def main():
     print("  height    = " + str(data.height))
     print("  depth     = " + str(data.depth))
     print("  numMips   = " + str(data.numMips))
-    print("  format    = " + data.format)
+    try:
+        print("  format    = " + data.format)
+    except:
+        print("  format    = " + str(data.format)
     print("  aa        = " + str(data.aa))
     print("  use       = " + str(data.use))
     print("  imageSize = " + str(data.imageSize))

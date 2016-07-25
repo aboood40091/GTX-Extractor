@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-<<<<<<< HEAD
 # Version v1.2c
-=======
-# Version v1.2b
->>>>>>> origin/master
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -28,11 +24,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-<<<<<<< HEAD
 version = '1.2c'
-=======
-version = '1.2b'
->>>>>>> origin/master
 
 # Pick a build directory
 dir_ = 'gtx_extract ' + version

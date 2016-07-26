@@ -267,7 +267,7 @@ def writeFile(data):
     elif data.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
         return export_RGBA8(data)
     elif data.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        return export_DXT5(data)
+        return export_BC3(data)
     else:
         print("")
         print("Unimplemented texture format: " + hex(data.format))
@@ -300,7 +300,7 @@ def export_RGBA8(gfd):
     img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
     yield img.copy(0, 0, gfd.width, gfd.height)
 
-def export_DXT5(gfd):
+def export_BC3(gfd):
     pos, x, y = 0, 0, 0
     outValue = 0
     blobWidth = gfd.width // 4
@@ -364,7 +364,7 @@ def PNGtoGFD(gfd):
             tex.save('DDSConv/mipmap_%d.png' % i)
         print('')
         print('Please open each PNG image in the DDSConv folder and convert '
-              'them to DDS. Use the DXT5 texel format, and do not include '
+              'them to DDS. Use the BC3/DXT5 texel format, and do not include '
               'mipmaps in the files.')
         print('')
         input("Press Enter when you are done to continue...")

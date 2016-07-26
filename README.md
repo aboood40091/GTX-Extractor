@@ -1,5 +1,5 @@
 # Wii U GTX Extractor
-Extracts textures in RGBA8 and DXT5 formats from the 'Gfx2' (.gtx file extension) format used in Wii U games.  
+Extracts textures in RGBA8 and BC3 (DXT5) formats from the 'Gfx2' (.gtx file extension) format used in Wii U games.  
   
 Can Also convert .png files into .gtx files!  
 

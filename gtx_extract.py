@@ -457,8 +457,12 @@ def main():
     """
     This place is a mess...
     """
+    print("GTX Extractor v1.3")
+    print("© 2014 Treeki, 2015-2016 AboodXD")
+    
     if len(sys.argv) != 2:
         if len(sys.argv) != 3:
+            print("")
             print("Usage (If converting from .gtx to png, and using source code): python gtx_extract.py input")
             print("Usage (If converting from .gtx to png, and using exe): gtx_extract.exe input")
             print("Usage (If converting from png to .gtx, and using source code): python gtx_extract.py input(.png) input(.gtx)")

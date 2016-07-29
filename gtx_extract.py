@@ -23,7 +23,7 @@
 
 import os, struct, sys, time
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui
 Qt = QtCore.Qt
 
 __author__ = "AboodXD"

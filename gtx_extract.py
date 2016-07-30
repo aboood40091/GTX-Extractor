@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v1.3
+# Version v1.4
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -461,7 +461,7 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v1.3")
+    print("GTX Extractor v1.4")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:

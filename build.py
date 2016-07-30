@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v1.3
+# Version v1.4
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -24,7 +24,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = 'v1.3'
+version = 'v1.4'
 
 # Pick a build directory
 dir_ = 'gtx_extract ' + version
@@ -64,4 +64,5 @@ setup(
 
 print('>> Attempting to copy required files...')
 shutil.copy('COPYING', dir_)
+shutil.copy('nvdxt.exe', dir_)
 shutil.copy('README.md', dir_)

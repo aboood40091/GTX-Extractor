@@ -344,16 +344,7 @@ def PNGtoGFD(gfd):
     Totally stolen... thanks RoadrunnerWMC
     """
 
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        numMips = 7
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        numMips = 1
-    else:
-        print("")
-        print("Unimplemented texture format: " + hex(gfd.format))
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+    numMips = gfd.numMips
 
     mip = []
     for i in range(numMips):
@@ -366,7 +357,7 @@ def PNGtoGFD(gfd):
             tex.save('DDSConv/mipmap_%d.png' % i)
         for i in range(numMips):
             print('')
-            os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+            os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
 
         dds = []
         for i in range(numMips):
@@ -387,6 +378,12 @@ def PNGtoGFD(gfd):
             ptr = mip1.bits()
             ptr.setsize(mip1.byteCount())
             mip2.append(ptr.asstring())
+    else:
+        print("")
+        print("Unimplemented texture format: " + hex(gfd.format))
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
     if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
         def swizzle(data, w, h):

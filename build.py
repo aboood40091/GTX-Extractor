@@ -66,3 +66,6 @@ print('>> Attempting to copy required files...')
 shutil.copy('COPYING', dir_)
 shutil.copy('nvdxt.exe', dir_)
 shutil.copy('README.md', dir_)
+print('>> Files copied!')
+
+print('>> GTX Extractor has been frozen to %s !' % dir_)

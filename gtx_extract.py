@@ -21,7 +21,7 @@
 
 """gtx_extract.py: Decode GFD (GTX/GSH) images."""
 
-import os, struct, sys, time
+import os, struct, sys, time, subprocess
 
 from PyQt5 import QtCore, QtGui
 Qt = QtCore.Qt
@@ -360,23 +360,27 @@ def PNGtoGFD(gfd):
         mip.append(QtGui.QImage(sys.argv[1]).scaledToWidth(gfd.width >> i, Qt.SmoothTransformation))
 
     if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+        if not os.path.isdir('DDSConv'):
+            os.makedirs('DDSConv')
         for i, tex in enumerate(mip):
             tex.save('DDSConv/mipmap_%d.png' % i)
-        print('')
-        print('Please open each PNG image in the DDSConv folder and convert '
-              'them to DDS. Use the BC3/DXT5 texel format, and do not include '
-              'mipmaps in the files.')
-        print('')
-        input("Press Enter when you are done to continue...")
-        
+        for i in range(numMips):
+            print('')
+            os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+
         dds = []
         for i in range(numMips):
             with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f:
                 dds.append(f.read())
+                f.close()
 
         mip2 = []
         for dds1 in dds:
             mip2.append(dds1[0x80:])
+
+        for filename in os.listdir('DDSConv'):
+            os.remove(os.path.join('DDSConv', filename))
+        import shutil; shutil.rmtree('DDSConv')
     elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
         mip2 = []
         for mip1 in mip:

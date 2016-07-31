@@ -301,7 +301,7 @@ def writeGFD(gfd, f):
 
         for i in range(gfd.numMips):
             print('')
-            os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+            os.system((os.path.dirname(os.path.abspath(sys.argv[0])) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
 
         ddsmipmaps = []
         for i in range(gfd.numMips):

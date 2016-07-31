@@ -279,7 +279,7 @@ def writePNG(gfd):
         img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
     else:
         print("")
-        print("Unimplemented texture format: " + hex(data.format))
+        print("Unimplemented texture format: " + hex(gfd.format))
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)

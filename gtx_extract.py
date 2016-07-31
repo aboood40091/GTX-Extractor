@@ -349,15 +349,43 @@ def writeGFD(gfd, f):
     assert len(swizzled_mips) == correctLen
 
     # Put it together into a proper GTX.
-    head1 = f[:(0xFC + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20)]
+    pos = 0
+    gfd.data = b''
+
+    header = GFDHeader()
+
+    header.data(f, pos)
+    
+    pos += header.size
+
+    while pos < len(f):
+        block = GFDBlockHeader()
+        block.data(f, pos)
+
+        pos += block.size
+
+        if block.type_ == 0x0B:
+            surface = GFDSurface()
+            surface.data(f, pos)
+
+            pos += surface.size
+
+        elif block.type_ == 0x0C and len(gfd.data) == 0:
+            head1 = f[:pos] # it works :P
+            pos += block.dataSize
+
+        else:
+            pos += block.dataSize
+
     if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        pad = struct.unpack(">I", f[(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x14):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x18)])[0]
-        mipSize = struct.unpack(">I", f[(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20 + pad + 0x14):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20 + pad + 0x18)])[0]
-        head2 = f[((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20 + pad + 0x20)]
-        head3 = f[((((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20)  + gfd.dataSize) + 0x20 + pad + 0x20) + mipSize):((((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20)  + gfd.dataSize) + 0x20 + pad + 0x20) + mipSize + 0x20)]
+        pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
+        mipSize = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x14):(len(head1) + gfd.dataSize + 0x20 + pad + 0x18)])[0]
+        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
+        head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize + 0x20)]
     elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
         head2 = b''
-        head3 = f[((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20)]
+        head3 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
+
     return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
 
 def swizzle_RGBA8(data, width, height, toGFD=False):

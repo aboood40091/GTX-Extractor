@@ -341,12 +341,14 @@ def writeGFD(gfd, f):
     swizzled_mips = b''
     for mip in swizzled_data[1:]:
         swizzled_mips += mip
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        correctLen = 0x57000
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
+    try:
         correctLen = 0
-    swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
-    assert len(swizzled_mips) == correctLen
+        swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
+        assert len(swizzled_mips) == correctLen
+    except:
+        correctLen = 0x57000
+        swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
+        assert len(swizzled_mips) == correctLen
 
     # Put it together into a proper GTX.
     pos = 0
@@ -377,16 +379,27 @@ def writeGFD(gfd, f):
         else:
             pos += block.dataSize
 
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 2:
         pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
         mipSize = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x14):(len(head1) + gfd.dataSize + 0x20 + pad + 0x18)])[0]
         head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
         head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize + 0x20)]
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        head2 = b''
-        head3 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
-
-    return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
+        return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
+    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x0D: # Crappy generated .gtx file
+        print("")
+        print("This program doesn't support creating a .gtx file of this type!!")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+    elif struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 1:
+        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
+        return head1 + swizzled_data[0] + head2
+    else:
+        print("")
+        print("Bad .gtx file!")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
 def swizzle_RGBA8(data, width, height, toGFD=False):
     result = bytearray(width * height * 4)

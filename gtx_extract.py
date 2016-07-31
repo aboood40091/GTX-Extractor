@@ -228,9 +228,6 @@ def readGFD(f):
 
             pos += surface.size
 
-            if block.dataSize != 0x9C:
-                raise ValueError("Invalid data block size!")
-
             gfd.dim = surface.dim
             gfd.width = surface.width
             gfd.height = surface.height
@@ -247,6 +244,7 @@ def readGFD(f):
             gfd.swizzle = surface.swizzle
             gfd.alignment = surface.alignment
             gfd.pitch = surface.pitch
+            #gfd.mipOffset = f[0x80:0x80 + 0x13]
 
         elif block.type_ == 0x0C and len(gfd.data) == 0:
             gfd.dataSize = block.dataSize
@@ -261,29 +259,113 @@ def readGFD(f):
 def swapRB(bgra):
     return bytes((bgra[2], bgra[1], bgra[0], bgra[3]))
 
-def writeFile(data):
-    if data.format == 0x00:
+def writePNG(gfd):
+    if gfd.format == 0x00:
         raise ValueError("Invalid format!")
-    elif data.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        return export_RGBA8(data)
-    elif data.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        return export_BC3(data)
+
+    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
+        img = QtGui.QImage(swizzle_RGBA8(gfd.data, gfd.width, gfd.height), gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
+
+    elif gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+        output = bytearray(gfd.width * gfd.height * 4)
+
+        for y in range(gfd.height):
+            for x in range(gfd.width):
+                outValue = fetch_2d_texel_rgba_dxt5(gfd.width, swizzle_BC3(gfd.data, gfd.width, gfd.height), x, y)
+
+                pos__ = (y * gfd.width + x) * 4
+                output[pos__:pos__ + 4] = outValue
+
+        img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
     else:
         print("")
         print("Unimplemented texture format: " + hex(data.format))
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
+    
+    yield img.copy(0, 0, gfd.width, gfd.height)
 
-def export_RGBA8(gfd):
-    pos, x, y = 0, 0, 0
+def writeGFD(gfd, f):
+    # Thanks RoadrunnerWMC
+    mipmaps = []
+    for i in range(gfd.numMips):
+        mipmaps.append(QtGui.QImage(sys.argv[1]).scaledToWidth(gfd.width >> i, Qt.SmoothTransformation))
 
-    source = gfd.data
-    output = bytearray(gfd.width * gfd.height * 4)
+    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+        if not os.path.isdir('DDSConv'):
+            os.makedirs('DDSConv')
 
-    for y in range(gfd.height):
-        for x in range(gfd.width):
-            pos = (y & ~15) * gfd.width
+        for i, tex in enumerate(mipmaps):
+            tex.save('DDSConv/mipmap_%d.png' % i)
+
+        for i in range(gfd.numMips):
+            print('')
+            os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+
+        ddsmipmaps = []
+        for i in range(gfd.numMips):
+            with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
+                ddsmipmaps.append(f1.read())
+                f1.close()
+
+        data = []
+        for mip in ddsmipmaps:
+            data.append(mip[0x80:])
+
+        for filename in os.listdir('DDSConv'):
+            os.remove(os.path.join('DDSConv', filename))
+        import shutil; shutil.rmtree('DDSConv')
+    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
+        data = []
+        for mip in mipmaps:
+            ptr = mip.bits()
+            ptr.setsize(mip.byteCount())
+            data.append(ptr.asstring())
+    else:
+        print("")
+        print("Unimplemented texture format: " + hex(gfd.format))
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+
+    swizzled_data = []
+    for i, data in enumerate(data):
+        if gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
+            result = swizzle_RGBA8(data, gfd.width >> i, gfd.height >> i, True)
+        elif gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+            result = swizzle_BC3(data, gfd.width >> i, gfd.height >> i, True)
+        swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i) * 4])
+
+    # Put the smaller swizzled mips together.
+    swizzled_mips = b''
+    for mip in swizzled_data[1:]:
+        swizzled_mips += mip
+    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+        correctLen = 0x57000
+    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
+        correctLen = 0
+    swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
+    assert len(swizzled_mips) == correctLen
+
+    # Put it together into a proper GTX.
+    head1 = f[:(0xFC + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20)]
+    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
+        pad = struct.unpack(">I", f[(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x14):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x18)])[0]
+        mipSize = struct.unpack(">I", f[(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20 + pad + 0x14):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20 + pad + 0x18)])[0]
+        head2 = f[((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20 + pad + 0x20)]
+        head3 = f[((((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20)  + gfd.dataSize) + 0x20 + pad + 0x20) + mipSize):((((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20)  + gfd.dataSize) + 0x20 + pad + 0x20) + mipSize + 0x20)]
+    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
+        head2 = b''
+        head3 = f[((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize):(((0xfc + struct.unpack(">I", f[0xF0:0xF4])[0] + 0x20) + gfd.dataSize) + 0x20)]
+    return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
+
+def swizzle_RGBA8(data, width, height, toGFD=False):
+    result = bytearray(width * height * 4)
+
+    for y in range(height):
+        for x in range(width):
+            pos = (y & ~15) * width
             pos ^= (x & 3)
             pos ^= ((x >> 2) & 1) << 3
             pos ^= ((x >> 3) & 1) << 6
@@ -293,19 +375,22 @@ def export_RGBA8(gfd):
             pos ^= ((y >> 1) & 7) << 4
             pos ^= (y & 0x10) << 4
             pos ^= (y & 0x20) << 2
-            pos_ = (y * gfd.width + x) * 4
+
+            pos_ = (y * width + x) * 4
             pos *= 4
-            output[pos_:pos_ + 4] = gfd.data[pos:pos + 4]
 
-    img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
-    yield img.copy(0, 0, gfd.width, gfd.height)
+            if toGFD:
+                result[pos:pos + 4] = swapRB(data[pos_:pos_ + 4])
+            else:
+                result[pos_:pos_ + 4] = data[pos:pos + 4]
 
-def export_BC3(gfd):
-    pos, x, y = 0, 0, 0
-    outValue = 0
-    blobWidth = gfd.width // 4
-    blobHeight = gfd.height // 4
-    work = bytearray(gfd.width * gfd.height)
+    return result
+
+def swizzle_BC3(data, width, height, toGFD=False):
+    blobWidth = width // 4
+    blobHeight = height // 4
+
+    result = bytearray(width * height)
 
     for y in range(blobHeight):
         for x in range(blobWidth):
@@ -324,134 +409,13 @@ def export_BC3(gfd):
 
             pos_ = (y * blobWidth + x) * 16
             pos *= 16
-            work[pos_:pos_ + 16] = gfd.data[pos:pos + 16]
 
-    output = bytearray(gfd.width * gfd.height * 4)
+            if toGFD:
+                result[pos:pos + 16] = data[pos_:pos_ + 16]
+            else:
+                result[pos_:pos_ + 16] = data[pos:pos + 16]
 
-    for y in range(gfd.height):
-        for x in range(gfd.width):
-            outValue = fetch_2d_texel_rgba_dxt5(gfd.width, work, x, y)
-
-            pos__ = (y * gfd.width + x) * 4
-            output[pos__:pos__ + 4] = outValue
-
-    img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
-    yield img.copy(0, 0, gfd.width, gfd.height)
-
-def PNGtoGFD(gfd):
-    """
-    What can I say? -_(^-^)_-
-    Totally stolen... thanks RoadrunnerWMC
-    """
-
-    numMips = gfd.numMips
-
-    mip = []
-    for i in range(numMips):
-        mip.append(QtGui.QImage(sys.argv[1]).scaledToWidth(gfd.width >> i, Qt.SmoothTransformation))
-
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        if not os.path.isdir('DDSConv'):
-            os.makedirs('DDSConv')
-        for i, tex in enumerate(mip):
-            tex.save('DDSConv/mipmap_%d.png' % i)
-        for i in range(numMips):
-            print('')
-            os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
-
-        dds = []
-        for i in range(numMips):
-            with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f:
-                dds.append(f.read())
-                f.close()
-
-        mip2 = []
-        for dds1 in dds:
-            mip2.append(dds1[0x80:])
-
-        for filename in os.listdir('DDSConv'):
-            os.remove(os.path.join('DDSConv', filename))
-        import shutil; shutil.rmtree('DDSConv')
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        mip2 = []
-        for mip1 in mip:
-            ptr = mip1.bits()
-            ptr.setsize(mip1.byteCount())
-            mip2.append(ptr.asstring())
-    else:
-        print("")
-        print("Unimplemented texture format: " + hex(gfd.format))
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        def swizzle(data, w, h):
-            blobWidth = w // 4
-            blobHeight = h // 4
-            result = bytearray(w * h)
-
-            for y in range(blobHeight):
-                for x in range(blobWidth):
-                    swizPos = ((y >> 4) * (blobWidth * 16)) & 0xFFFF
-                    swizPos ^= (y & 1)
-                    swizPos ^= (x & 7) << 1
-                    swizPos ^= (x & 8) << 1
-                    swizPos ^= (x & 8) << 2
-                    swizPos ^= (x & 0x10) << 2
-                    swizPos ^= (x & ~0x1F) << 4
-                    swizPos ^= (y & 2) << 6
-                    swizPos ^= (y & 4) << 6
-                    swizPos ^= (y & 8) << 1
-                    swizPos ^= (y & 0x10) << 2
-                    swizPos ^= (y & 0x20)
-                    swizPos *= 16
-                    xyPos = (y * blobWidth + x) * 16
-                    result[swizPos:swizPos + 16] = data[xyPos:xyPos + 16]
-            return result[:w * h]
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        def swizzle(data, w, h):
-            result = bytearray(w * h * 4)
-
-            for y in range(0, h):
-                for x in range(0, w):
-                    swizPos = (y & ~15) * w
-                    swizPos ^= (x & 3)
-                    swizPos ^= ((x >> 2) & 1) << 3
-                    swizPos ^= ((x >> 3) & 1) << 6
-                    swizPos ^= ((x >> 3) & 1) << 7
-                    swizPos ^= (x & ~0xF) << 4
-                    swizPos ^= (y & 1) << 2
-                    swizPos ^= ((y >> 1) & 7) << 4
-                    swizPos ^= (y & 0x10) << 4
-                    swizPos ^= (y & 0x20) << 2
-                    swizPos *= 4
-                    xyPos = (y * w + x) * 4
-                    result[swizPos:swizPos + 4] = swapRB(data[xyPos:xyPos + 4])
-            return result[:w * h * 4]
-
-    swizzled = []
-    for i, mip in enumerate(mip2):
-        swizzled.append(swizzle(mip, gfd.width >> i, gfd.height >> i))
-
-    # Put the smaller swizzled mips together.
-    swizzledmips = b''
-    for mip in swizzled[1:]:
-        swizzledmips += mip
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        correctLen = 0x57000
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        correctLen = 0
-    swizzledmips += b'\0' * (correctLen - len(swizzledmips))
-    assert len(swizzledmips) == correctLen
-
-    # Put it together into a proper GTX.
-    if gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        head2 = b'replace'
-    elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        head2 = b''
-    return swizzled[0] + head2 + swizzledmips
-        
+    return result
 
 
 def main():
@@ -517,18 +481,17 @@ def main():
     name = os.path.splitext(sys.argv[1])[0]
 
     if sys.argv[1].endswith('.gtx'):
-        for img in writeFile(data):
+        for img in writePNG(data):
             img.save(name + ".png")
             print('')
             print('Finished converting: ' + sys.argv[1])
 
     elif sys.argv[1].endswith('.png'):
-        pngdata = PNGtoGFD(data)
         if os.path.isfile(name + ".gtx"):
             output = open(name + "2.gtx", 'wb+')
         else:
             output = open(name + ".gtx", 'wb+')
-        output.write(pngdata)
+        output.write(writeGFD(data, inb))
         output.close()
         print('')
         print('Finished converting: ' + sys.argv[1])

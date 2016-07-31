@@ -261,29 +261,23 @@ def swapRB(bgra):
 
 def writePNG(gfd):
     if gfd.format == 0x00:
-        raise ValueError("Invalid format!")
+        raise ValueError("Invalid texture format!")
 
     elif gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
-        img = QtGui.QImage(swizzle_RGBA8(gfd.data, gfd.width, gfd.height), gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
+        result = swizzle_RGBA8(gfd.data, gfd.width, gfd.height)
+        img = QtGui.QImage(result, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
 
     elif gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-        output = bytearray(gfd.width * gfd.height * 4)
-
-        for y in range(gfd.height):
-            for x in range(gfd.width):
-                outValue = fetch_2d_texel_rgba_dxt5(gfd.width, swizzle_BC3(gfd.data, gfd.width, gfd.height), x, y)
-
-                pos__ = (y * gfd.width + x) * 4
-                output[pos__:pos__ + 4] = outValue
-
+        result, output = swizzle_BC3(gfd.data, gfd.width, gfd.height)
         img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
+
     else:
         print("")
         print("Unimplemented texture format: " + hex(gfd.format))
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
-    
+
     yield img.copy(0, 0, gfd.width, gfd.height)
 
 def writeGFD(gfd, f):
@@ -301,7 +295,10 @@ def writeGFD(gfd, f):
 
         for i in range(gfd.numMips):
             print('')
-            os.system((os.path.dirname(os.path.abspath(sys.argv[0])) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+            try:
+                os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+            except NameError:  # We are using the built exe, not py
+                os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
 
         ddsmipmaps = []
         for i in range(gfd.numMips):
@@ -334,7 +331,7 @@ def writeGFD(gfd, f):
         if gfd.format == "GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM":
             result = swizzle_RGBA8(data, gfd.width >> i, gfd.height >> i, True)
         elif gfd.format == "GX2_SURFACE_FORMAT_T_BC3_UNORM":
-            result = swizzle_BC3(data, gfd.width >> i, gfd.height >> i, True)
+            result, output = swizzle_BC3(data, gfd.width >> i, gfd.height >> i, True)
         swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i) * 4])
 
     # Put the smaller swizzled mips together.
@@ -456,7 +453,19 @@ def swizzle_BC3(data, width, height, toGFD=False):
             else:
                 result[pos_:pos_ + 16] = data[pos:pos + 16]
 
-    return result
+    if toGFD:
+        output = b''
+    else:
+        output = bytearray(width * height * 4)
+
+        for y in range(height):
+            for x in range(width):
+                outValue = fetch_2d_texel_rgba_dxt5(width, result, x, y)
+
+                pos__ = (y * width + x) * 4
+                output[pos__:pos__ + 4] = outValue
+
+    return result, output
 
 
 def main():

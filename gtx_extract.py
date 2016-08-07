@@ -2,7 +2,7 @@
 
 # GTX Extractor
 # Version v1.4
-# Copyright © 2014 Treeki, 2015-2016 AboodXD
+# Copyright © 2014 Treeki, 2015 RoadrunnerWMC, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -27,7 +27,7 @@ from PyQt5 import QtCore, QtGui
 Qt = QtCore.Qt
 
 __author__ = "AboodXD"
-__copyright__ = "Copyright 2015, 2016 AboodXD"
+__copyright__ = "Copyright 2014 Treeki, 2015 RoadrunnerWMC, 2015-2016 AboodXD"
 __credits__ = ["AboodXD", "libdxtn", "Treeki",
                     "Reggie Next! team"]
 

@@ -27,7 +27,7 @@ from PyQt5 import QtCore, QtGui
 Qt = QtCore.Qt
 
 __author__ = "AboodXD"
-__copyright__ = "2014 Treeki, 2015 RoadrunnerWMC, 2015-2016 AboodXD"
+__copyright__ = "Copyright 2014 Treeki, 2015 RoadrunnerWMC, 2015-2016 AboodXD"
 __credits__ = ["AboodXD", "libtxc_dxtn", "Treeki",
                     "Reggie Next! team"]
 

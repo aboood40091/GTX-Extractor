@@ -28,59 +28,103 @@ Qt = QtCore.Qt
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2015, 2016 AboodXD"
-__credits__ = ["AboodXD", "libdxtn", "Treeki",
+__credits__ = ["AboodXD", "libtxc_dxtn", "Treeki",
                     "Reggie Next! team"]
 
-# ----------\/-Start of libdxtn section-\/---------- #
-def Expand_shit(packedcol):
-    EXP5TO8R = int((((packedcol) >> 8) & 0xf8) | (((packedcol) >> 13) & 0x07))
-    EXP6TO8G = int((((packedcol) >> 3) & 0xfc) | (((packedcol) >>  9) & 0x03))
-    EXP5TO8B = int((((packedcol) << 3) & 0xf8) | (((packedcol) >>  2) & 0x07))
+# ----------\/-Start of libtxc_dxtn section-\/---------- #
+def EXP5TO8R(packedcol):
+    return int((((packedcol) >> 8) & 0xf8) | (((packedcol) >> 13) & 0x07))
 
-    return EXP5TO8R, EXP6TO8G, EXP5TO8B
+def EXP6TO8G(packedcol):
+    return int((((packedcol) >> 3) & 0xfc) | (((packedcol) >>  9) & 0x03))
+
+def EXP5TO8B(packedcol):
+    return int((((packedcol) << 3) & 0xf8) | (((packedcol) >>  2) & 0x07))
+
+def EXP4TO8(col):
+    return int((col) | ((col) << 4))
+
+# inefficient. To be efficient, it would be necessary to decode 16 pixels at once
 
 def dxt135_decode_imageblock(pixdata, img_block_src, i, j, dxt_type):
     color0 = pixdata[img_block_src] | (pixdata[img_block_src + 1] << 8)
     color1 = pixdata[img_block_src + 2] | (pixdata[img_block_src + 3] << 8)
-    bits = (pixdata[img_block_src + 4] | (pixdata[img_block_src + 5] << 8) |
-        (pixdata[img_block_src + 6] << 16) | (pixdata[img_block_src + 7] << 24))
+    bits = pixdata[img_block_src + 4] | (pixdata[img_block_src + 5] << 8) | (pixdata[img_block_src + 6] << 16) | (pixdata[img_block_src + 7] << 24)
     # What about big/little endian?
     bit_pos = 2 * (j * 4 + i)
     code = (bits >> bit_pos) & 3
 
     ACOMP = 255
-
-    EXP5TO8R0, EXP6TO8G0, EXP5TO8B0 = Expand_shit(color0)
-    EXP5TO8R1, EXP6TO8G1, EXP5TO8B1 = Expand_shit(color1)
-
     if code == 0:
-        RCOMP = EXP5TO8R0
-        GCOMP = EXP6TO8G0
-        BCOMP = EXP5TO8B0
+        RCOMP = EXP5TO8R(color0)
+        GCOMP = EXP6TO8G(color0)
+        BCOMP = EXP5TO8B(color0)
     elif code == 1:
-        RCOMP = EXP5TO8R1
-        GCOMP = EXP6TO8G1
-        BCOMP = EXP5TO8B1
+        RCOMP = EXP5TO8R(color1)
+        GCOMP = EXP6TO8G(color1)
+        BCOMP = EXP5TO8B(color1)
     elif code == 2:
         if (dxt_type > 1) or (color0 > color1):
-            RCOMP = (EXP5TO8R0 * 2 + EXP5TO8R1) // 3
-            GCOMP = (EXP6TO8G0 * 2 + EXP6TO8G1) // 3
-            BCOMP = (EXP5TO8B0 * 2 + EXP5TO8B1) // 3
+            RCOMP = ((EXP5TO8R(color0) * 2 + EXP5TO8R(color1)) // 3)
+            GCOMP = ((EXP6TO8G(color0) * 2 + EXP6TO8G(color1)) // 3)
+            BCOMP = ((EXP5TO8B(color0) * 2 + EXP5TO8B(color1)) // 3)
         else:
-            RCOMP = (EXP5TO8R0 + EXP5TO8R1) // 2
-            GCOMP = (EXP6TO8G0 + EXP6TO8G1) // 2
-            BCOMP = (EXP5TO8B0 + EXP5TO8B1) // 2
+            RCOMP = ((EXP5TO8R(color0) + EXP5TO8R(color1)) // 2)
+            GCOMP = ((EXP6TO8G(color0) + EXP6TO8G(color1)) // 2)
+            BCOMP = ((EXP5TO8B(color0) + EXP5TO8B(color1)) // 2)
     elif code == 3:
         if (dxt_type > 1) or (color0 > color1):
-            RCOMP = (EXP5TO8R0 + EXP5TO8R1 * 2) // 3
-            GCOMP = (EXP6TO8G0 + EXP6TO8G1 * 2) // 3
-            BCOMP = (EXP5TO8B0 + EXP5TO8B1 * 2) // 3
+            RCOMP = ((EXP5TO8R(color0) + EXP5TO8R(color1) * 2) // 3)
+            GCOMP = ((EXP6TO8G(color0) + EXP6TO8G(color1) * 2) // 3)
+            BCOMP = ((EXP5TO8B(color0) + EXP5TO8B(color1) * 2) // 3)
         else:
             RCOMP = 0
             GCOMP = 0
             BCOMP = 0
             if dxt_type == 1: ACOMP = 0
+    else:
+        # CANNOT happen (I hope)
+        pass
+
     return ACOMP, RCOMP, GCOMP, BCOMP
+
+def fetch_2d_texel_rgb_dxt1(srcRowStride, pixdata, i, j):
+
+    """
+    Extract the (i,j) pixel from pixdata and return it
+    in RCOMP, GCOMP, BCOMP, ACOMP.
+    """
+
+    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
+    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 0)
+
+    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+
+def fetch_2d_texel_rgba_dxt1(srcRowStride, pixdata, i, j):
+
+    """
+    Extract the (i,j) pixel from pixdata and return it
+    in RCOMP, GCOMP, BCOMP, ACOMP.
+    """
+
+    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
+    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 1)
+
+    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+
+def fetch_2d_texel_rgba_dxt3(srcRowStride, pixdata, i, j):
+
+    """
+    Extract the (i,j) pixel from pixdata and return it
+    in RCOMP, GCOMP, BCOMP, ACOMP.
+    """
+
+    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
+    anibble = (pixdata[blksrc + ((j & 3) * 4 + (i & 3)) // 2] >> (4 * (i & 1))) & 0x0f
+    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
+    ACOMP = EXP4TO8(anibble)
+
+    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
 
 def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
 

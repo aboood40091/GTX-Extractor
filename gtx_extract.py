@@ -912,7 +912,7 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v1.4")
+    print("GTX Extractor v2.0")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:

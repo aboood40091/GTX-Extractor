@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v2.0
+# Version v2.1
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -21,7 +21,7 @@
 
 """gtx_extract.py: Decode GFD (GTX/GSH) images."""
 
-import os, struct, sys, time, subprocess
+import os, struct, sys, time
 
 from PyQt5 import QtCore, QtGui
 Qt = QtCore.Qt
@@ -29,7 +29,7 @@ Qt = QtCore.Qt
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2016 AboodXD"
 __credits__ = ["AboodXD", "libtxc_dxtn", "Treeki",
-                    "Reggie Next! team", "Exzap"]
+                    "Exzap", "RoadrunnerWMC"]
 
 formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x00000823: 'GX2_SURFACE_FORMAT_TC_R32_G32_B32_A32_FLOAT',
@@ -129,10 +129,21 @@ def fetch_2d_texel_rgb_dxt1(srcRowStride, pixdata, i, j):
     in RCOMP, GCOMP, BCOMP, ACOMP.
     """
 
-    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
-    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 0)
+    try:
+        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
+        test = pixdata[blksrc]
+        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 0)
 
-    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+
+    except IndexError:
+        print("")
+        print("This type of BC compression is not equivalent to DXT compression!")
+        print("AboodXD is currently working on a workaround for this... ;)")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
 def fetch_2d_texel_rgba_dxt1(srcRowStride, pixdata, i, j):
 
@@ -141,10 +152,21 @@ def fetch_2d_texel_rgba_dxt1(srcRowStride, pixdata, i, j):
     in RCOMP, GCOMP, BCOMP, ACOMP.
     """
 
-    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
-    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 1)
+    try:
+        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
+        test = pixdata[blksrc]
+        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 1)
 
-    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+
+    except IndexError:
+        print("")
+        print("This type of BC compression is not equivalent to DXT compression!")
+        print("AboodXD is currently working on a workaround for this... ;)")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
 def fetch_2d_texel_rgba_dxt3(srcRowStride, pixdata, i, j):
 
@@ -153,12 +175,22 @@ def fetch_2d_texel_rgba_dxt3(srcRowStride, pixdata, i, j):
     in RCOMP, GCOMP, BCOMP, ACOMP.
     """
 
-    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
-    anibble = (pixdata[blksrc + ((j & 3) * 4 + (i & 3)) // 2] >> (4 * (i & 1))) & 0x0f
-    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
-    ACOMP = EXP4TO8(anibble)
+    try:
+        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
+        anibble = (pixdata[blksrc + ((j & 3) * 4 + (i & 3)) // 2] >> (4 * (i & 1))) & 0x0f
+        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
+        ACOMP = EXP4TO8(anibble)
 
-    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+
+    except IndexError:
+        print("")
+        print("This type of BC compression is not equivalent to DXT compression!")
+        print("AboodXD is currently working on a workaround for this... ;)")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
 def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
 
@@ -167,31 +199,41 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
     in RCOMP, GCOMP, BCOMP, ACOMP.
     """
 
-    blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
-    alpha0 = pixdata[blksrc]
-    alpha1 = pixdata[blksrc + 1]
-    # TODO test this!
-    bit_pos = ((j & 3) * 4 + (i & 3)) * 3
-    acodelow = pixdata[blksrc + 2 + bit_pos // 8]
-    acodehigh = pixdata[blksrc + 3 + bit_pos // 8]
-    code = (acodelow >> (bit_pos & 0x07) |
-        (acodehigh << (8 - (bit_pos & 0x07)))) & 0x07
-    ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
+    try:
+        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
+        alpha0 = pixdata[blksrc]
+        alpha1 = pixdata[blksrc + 1]
+        # TODO test this!
+        bit_pos = ((j & 3) * 4 + (i & 3)) * 3
+        acodelow = pixdata[blksrc + 2 + bit_pos // 8]
+        acodehigh = pixdata[blksrc + 3 + bit_pos // 8]
+        code = (acodelow >> (bit_pos & 0x07) |
+            (acodehigh << (8 - (bit_pos & 0x07)))) & 0x07
+        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
 
-    if code == 0:
-        ACOMP = alpha0
-    elif code == 1:
-        ACOMP = alpha1
-    elif alpha0 > alpha1:
-        ACOMP = (alpha0 * (8 - code) + (alpha1 * (code - 1))) // 7
-    elif code < 6:
-        ACOMP = (alpha0 * (6 - code) + (alpha1 * (code - 1))) // 5
-    elif code == 6:
-        ACOMP = 0
-    else:
-        ACOMP = 255
+        if code == 0:
+            ACOMP = alpha0
+        elif code == 1:
+            ACOMP = alpha1
+        elif alpha0 > alpha1:
+            ACOMP = (alpha0 * (8 - code) + (alpha1 * (code - 1))) // 7
+        elif code < 6:
+            ACOMP = (alpha0 * (6 - code) + (alpha1 * (code - 1))) // 5
+        elif code == 6:
+            ACOMP = 0
+        else:
+            ACOMP = 255
 
-    return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
+
+    except IndexError:
+        print("")
+        print("This type of BC compression is not equivalent to DXT compression!")
+        print("AboodXD is currently working on a workaround for this... :)")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
 def fetch_2d_texel_rgba_dxt(data, width, height, format_):
 
@@ -232,7 +274,7 @@ class GFDData():
 
 class GFDHeader(struct.Struct):
     def __init__(self):
-        super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
+        super().__init__('>4s7I')
 
     def data(self, data, pos):
         (self.magic,
@@ -246,7 +288,7 @@ class GFDHeader(struct.Struct):
 
 class GFDBlockHeader(struct.Struct):
     def __init__(self):
-        super().__init__('>4s7I') # Totally stolen, thanks Reggie Next team!
+        super().__init__('>4s7I')
 
     def data(self, data, pos):
         (self.magic,
@@ -260,7 +302,7 @@ class GFDBlockHeader(struct.Struct):
 
 class GFDSurface(struct.Struct):
     def __init__(self):
-        super().__init__('>39I') # Totally stolen, thanks Reggie Next team!
+        super().__init__('>16I')
 
     def data(self, data, pos):
         (self.dim,
@@ -278,42 +320,17 @@ class GFDSurface(struct.Struct):
         self.tileMode,
         self.swizzle,
         self.alignment,
-        self.pitch,
-        self.mipOffset,
-        self._44,
-        self._48,
-        self._4C,
-        self._50,
-        self._54,
-        self._58,
-        self._5C,
-        self._60,
-        self._64,
-        self._68,
-        self._6C,
-        self._70,
-        self._74,
-        self._78,
-        self._7C,
-        self._80,
-        self._84,
-        self._88,
-        self._8C,
-        self._90,
-        self._94,
-        self._98) = self.unpack_from(data, pos)
+        self.pitch) = self.unpack_from(data, pos)
+
+def swapRB(bgra):
+    return bytes((bgra[2], bgra[1], bgra[0], bgra[3]))
 
 def readGFD(f):
     gfd = GFDData()
+
     pos = 0
 
     header = GFDHeader()
-
-    # This is kinda bad. Don't really care right now >.>
-    gfd.width = 0
-    gfd.height = 0
-    gfd.data = b''
-
     header.data(f, pos)
     
     if header.magic != b'Gfx2':
@@ -321,7 +338,7 @@ def readGFD(f):
 
     pos += header.size
 
-    while pos < len(f):
+    while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
         block = GFDBlockHeader()
         block.data(f, pos)
 
@@ -335,6 +352,7 @@ def readGFD(f):
             surface.data(f, pos)
 
             pos += surface.size
+            pos += (23 * 4)
 
             gfd.dim = surface.dim
             gfd.width = surface.width
@@ -352,9 +370,8 @@ def readGFD(f):
             gfd.swizzle = surface.swizzle
             gfd.alignment = surface.alignment
             gfd.pitch = surface.pitch
-            #gfd.mipOffset = f[0x80:0x80 + 0x13]
 
-        elif block.type_ == 0x0C and len(gfd.data) == 0:
+        elif block.type_ == 0x0C:
             gfd.dataSize = block.dataSize
             gfd.data = f[pos:pos + block.dataSize]
             pos += block.dataSize
@@ -363,9 +380,6 @@ def readGFD(f):
             pos += block.dataSize
 
     return gfd
-
-def swapRB(bgra):
-    return bytes((bgra[2], bgra[1], bgra[0], bgra[3]))
 
 def writePNG(gfd):
     if gfd.format in formats:
@@ -380,6 +394,7 @@ def writePNG(gfd):
 
             else:
                 result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+
                 output = fetch_2d_texel_rgba_dxt(result, gfd.width, gfd.height, gfd.format)
 
                 img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
@@ -393,9 +408,143 @@ def writePNG(gfd):
 
     yield img.copy(0, 0, gfd.width, gfd.height)
 
+def writeGFD(gfd, f):
+    # Thanks RoadrunnerWMC
+    mipmaps = []
+    for i in range(gfd.numMips):
+        mipmaps.append(QtGui.QImage(sys.argv[1]).scaledToWidth(gfd.width >> i, Qt.SmoothTransformation))
+
+    if gfd.format in formats:
+        if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
+            data = []
+            for mip in mipmaps:
+                ptr = mip.bits()
+                ptr.setsize(mip.byteCount())
+                data.append(ptr.asstring())
+        else:
+            if not os.path.isdir('DDSConv'):
+                os.makedirs('DDSConv')
+
+            for i, tex in enumerate(mipmaps):
+                tex.save('DDSConv/mipmap_%d.png' % i)
+
+            for i in range(gfd.numMips):
+                print('')
+                if (gfd.format == 0x31 or gfd.format == 0x431):
+                    try:
+                        os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt1 -output DDSConv/mipmap_%d.dds' % i))
+                    except NameError:  # We are using the built exe, not py
+                        os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt1 -output DDSConv/mipmap_%d.dds' % i))
+                elif (gfd.format == 0x32 or gfd.format == 0x432):
+                    try:
+                        os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt3 -output DDSConv/mipmap_%d.dds' % i))
+                    except NameError:  # We are using the built exe, not py
+                        os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt3 -output DDSConv/mipmap_%d.dds' % i))
+                elif (gfd.format == 0x33 or gfd.format == 0x433):
+                    try:
+                        os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+                    except NameError:  # We are using the built exe, not py
+                        os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+
+            ddsmipmaps = []
+            for i in range(gfd.numMips):
+                with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
+                    ddsmipmaps.append(f1.read())
+                    f1.close()
+
+            data = []
+            for mip in ddsmipmaps:
+                data.append(mip[0x80:])
+
+            for filename in os.listdir('DDSConv'):
+                os.remove(os.path.join('DDSConv', filename))
+            import shutil; shutil.rmtree('DDSConv')
+    else:
+        print("")
+        print("Unsupported texture format: " + hex(gfd.format))
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+
+    swizzled_data = []
+    for i, data in enumerate(data):
+        if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
+            result = swizzle(gfd.width >> i, gfd.height >> i, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
+            swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i) * 4])
+        else:
+            result = swizzle_BC(gfd.width >> i, gfd.height >> i, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
+            swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i)])
+
+    # Put the smaller swizzled mips together.
+    swizzled_mips = b''
+    for mip in swizzled_data[1:]:
+        swizzled_mips += mip
+    correctLen = gfd.mipSize
+    swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
+    assert len(swizzled_mips) == correctLen
+
+    # Put it together into a proper GTX.
+    pos = 0
+
+    header = GFDHeader()
+    header.data(f, pos)
+    
+    pos += header.size
+
+    real = False
+
+    while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
+        block = GFDBlockHeader()
+        block.data(f, pos)
+
+        pos += block.size
+
+        if block.type_ == 0x0B:
+            surface = GFDSurface()
+            surface.data(f, pos)
+
+            pos += surface.size
+            pos += (23 * 4)
+
+        elif block.type_ == 0x0C:
+            head1 = f[:pos] # it works :P
+            pos += block.dataSize
+        
+        elif block.type_ == 0x02:
+            real = True
+            pos += block.dataSize
+
+        else:
+            pos += block.dataSize
+
+    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 2:
+        pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
+        mipSize = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x14):(len(head1) + gfd.dataSize + 0x20 + pad + 0x18)])[0]
+        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
+        head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize + 0x20)]
+        return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
+
+    elif (struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x0D or not real): # Crappy generated .gtx file
+        print("")
+        print("This program doesn't support creating a .gtx file of this type!!")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+
+    elif struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 1:
+        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
+        return head1 + swizzled_data[0] + head2
+
+    else:
+        print("")
+        print("Bad .gtx file!")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+
 # ----------\/-Start of the swizzling section-\/---------- #
-def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data):
-    result = bytearray()
+def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
+    result = bytearray(width * height * 4)
 
     for y in range(height):
         for x in range(width):
@@ -409,16 +558,19 @@ def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data):
             elif (tileMode == 2 or tileMode == 3):
                 pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, 0, bpp, pitch, height, tileMode, false, 0, 0, bitPos)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1, tileMode, false, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
+                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1*1, tileMode, false, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
 
             pos_ = (y * width + x) * 4
 
-            result[pos_:pos_ + 4] = data[pos:pos + 4]
+            if toGFD:
+                result[pos:pos + 4] = swapRB(data[pos_:pos_ + 4])
+            else:
+                result[pos_:pos_ + 4] = data[pos:pos + 4]
 
     return result
 
-def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data):
-    result = bytearray()
+def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
+    result = bytearray(width * height)
 
     width = width // 4
     height = height // 4
@@ -440,11 +592,17 @@ def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data):
             if (format_ == 0x31 or format_ == 0x431):
                 pos_ = (y * width + x) * 8
 
-                result[pos_:pos_ + 8] = data[pos:pos + 8]
+                if toGFD:
+                    result[pos:pos + 8] = data[pos_:pos_ + 8]
+                else:
+                    result[pos_:pos_ + 8] = data[pos:pos + 8]
             else:
                 pos_ = (y * width + x) * 16
 
-                result[pos_:pos_ + 16] = data[pos:pos + 16]
+                if toGFD:
+                    result[pos:pos + 16] = data[pos_:pos_ + 16]
+                else:
+                    result[pos_:pos_ + 16] = data[pos:pos + 16]
 
     return result
 
@@ -912,30 +1070,36 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v2.0")
+    print("GTX Extractor v2.1")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:
-        print("")
-        print("Usage (If converting from .gtx to png, and using source code): python gtx_extract.py input")
-        print("Usage (If converting from .gtx to png, and using exe): gtx_extract.exe input")
-        print("Usage (If converting from png to .gtx, and using source code): python gtx_extract.py input(.png) input(.gtx)")
-        print("Usage (If converting from png to .gtx, and using exe): gtx_extract.exe input(png) input(.gtx)")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        if len(sys.argv) != 3:
+            print("")
+            print("Usage (If converting from .gtx to .png, and using source code): python gtx_extract.py input")
+            print("Usage (If converting from .gtx to .png, and using exe): gtx_extract.exe input")
+            print("Usage (If converting from .png to .gtx, and using source code): python gtx_extract.py input(.png) input(.gtx)")
+            print("Usage (If converting from .png to .gtx, and using exe): gtx_extract.exe input(.png) input(.gtx)")
+            print("")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
     
-    with open(sys.argv[1], "rb") as inf:
-        print('Converting: ' + sys.argv[1])
-        inb = inf.read()
-        inf.close()
+    if sys.argv[1].endswith('.gtx'):
+        with open(sys.argv[1], "rb") as inf:
+            print('Converting: ' + sys.argv[1])
+            inb = inf.read()
+            inf.close()
+    elif sys.argv[1].endswith('.png'):
+        with open(sys.argv[2], "rb") as inf:
+            print('Converting: ' + sys.argv[1])
+            inb = inf.read()
+            inf.close()
     
     data = readGFD(inb)
 
     print("")
     print("// ----- GX2Surface Info ----- ")
-    #print("  index     = " + str(0))
     print("  dim       = " + str(data.dim))
     print("  width     = " + str(data.width))
     print("  height    = " + str(data.height))
@@ -953,12 +1117,22 @@ def main():
     print("  swizzle   = " + str(data.swizzle) + ", " + hex(data.swizzle))
     print("  alignment = " + str(data.alignment))
     print("  pitch     = " + str(data.pitch))
-    #print("  mipOffset = " + str(data.mipOffset))
     
     name = os.path.splitext(sys.argv[1])[0]
 
-    for img in writePNG(data):
-        img.save(name + ".png")
+    if sys.argv[1].endswith('.gtx'):
+        for img in writePNG(data):
+            img.save(name + ".png")
+            print('')
+            print('Finished converting: ' + sys.argv[1])
+
+    elif sys.argv[1].endswith('.png'):
+        if os.path.isfile(name + ".gtx"):
+            output = open(name + "2.gtx", 'wb+')
+        else:
+            output = open(name + ".gtx", 'wb+')
+        output.write(writeGFD(data, inb))
+        output.close()
         print('')
         print('Finished converting: ' + sys.argv[1])
 

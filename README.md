@@ -10,7 +10,7 @@ Treeki - Original GTX Extractor
 
 AboodXD - porting GTX Extractor to python, adding new stuff.
 
-Reggie Next! team - Getting the struct needed to get the file magic, width, height, etc... (As you can tell, I didn't know how to use unpack_from()...)  
-  
 # Special thanks to:
-Exzap - Helping with swizzling.
+Exzap - Helping with swizzling.  
+
+RoadrunnerWMC - Helping with implementing the "creating .gtx files" feature.

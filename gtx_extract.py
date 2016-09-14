@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v2.1
+# Version v2.2
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -49,9 +49,6 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x00000033: 'GX2_SURFACE_FORMAT_T_BC3_UNORM',
            0x00000433: 'GX2_SURFACE_FORMAT_T_BC3_SRGB'
            }
-
-false = 0
-true = 1
 
 m_banks = 4
 m_banksBitcount = 2
@@ -118,7 +115,12 @@ def dxt135_decode_imageblock(pixdata, img_block_src, i, j, dxt_type):
             if dxt_type == 1: ACOMP = 0
     else:
         # CANNOT happen (I hope)
-        pass
+        print("")
+        print("Whoops, something went wrong while decompressing...")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
     return ACOMP, RCOMP, GCOMP, BCOMP
 
@@ -138,8 +140,7 @@ def fetch_2d_texel_rgb_dxt1(srcRowStride, pixdata, i, j):
 
     except IndexError:
         print("")
-        print("This type of BC compression is not equivalent to DXT compression!")
-        print("AboodXD is currently working on a workaround for this... ;)")
+        print("Whoops, something went wrong while decompressing...")
         print("")
         print("Exiting in 5 seconds...")
         time.sleep(5)
@@ -161,8 +162,7 @@ def fetch_2d_texel_rgba_dxt1(srcRowStride, pixdata, i, j):
 
     except IndexError:
         print("")
-        print("This type of BC compression is not equivalent to DXT compression!")
-        print("AboodXD is currently working on a workaround for this... ;)")
+        print("Whoops, something went wrong while decompressing...")
         print("")
         print("Exiting in 5 seconds...")
         time.sleep(5)
@@ -185,8 +185,7 @@ def fetch_2d_texel_rgba_dxt3(srcRowStride, pixdata, i, j):
 
     except IndexError:
         print("")
-        print("This type of BC compression is not equivalent to DXT compression!")
-        print("AboodXD is currently working on a workaround for this... ;)")
+        print("Whoops, something went wrong while decompressing...")
         print("")
         print("Exiting in 5 seconds...")
         time.sleep(5)
@@ -228,8 +227,7 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
 
     except IndexError:
         print("")
-        print("This type of BC compression is not equivalent to DXT compression!")
-        print("AboodXD is currently working on a workaround for this... :)")
+        print("Whoops, something went wrong while decompressing...")
         print("")
         print("Exiting in 5 seconds...")
         time.sleep(5)
@@ -241,7 +239,7 @@ def fetch_2d_texel_rgba_dxt(data, width, height, format_):
     Does the decompression for DXT compressed images.
     """
 
-    output = bytearray()
+    output = bytearray(width * height * 4)
 
     for y in range(height):
         for x in range(width):
@@ -383,6 +381,8 @@ def readGFD(f):
 
 def writePNG(gfd):
     if gfd.format in formats:
+        if gfd.depth != 1:
+            raise NotImplementedError("Unsupported depth!")
         if gfd.format == 0x00:
             raise ValueError("Invalid texture format!")
 
@@ -428,6 +428,7 @@ def writeGFD(gfd, f):
             for i, tex in enumerate(mipmaps):
                 tex.save('DDSConv/mipmap_%d.png' % i)
 
+            ddsmipmaps = []
             for i in range(gfd.numMips):
                 print('')
                 if (gfd.format == 0x31 or gfd.format == 0x431):
@@ -446,8 +447,6 @@ def writeGFD(gfd, f):
                     except NameError:  # We are using the built exe, not py
                         os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
 
-            ddsmipmaps = []
-            for i in range(gfd.numMips):
                 with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
                     ddsmipmaps.append(f1.read())
                     f1.close()
@@ -517,21 +516,20 @@ def writeGFD(gfd, f):
         else:
             pos += block.dataSize
 
-    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 2:
-        pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
-        mipSize = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x14):(len(head1) + gfd.dataSize + 0x20 + pad + 0x18)])[0]
-        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
-        head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + mipSize + 0x20)]
-        return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
-
-    elif (struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x0D or not real): # Crappy generated .gtx file
+    if not real: # Crappy generated .gtx file :/
         print("")
         print("This program doesn't support creating a .gtx file of this type!!")
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
 
-    elif struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 1:
+    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x02:
+        pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
+        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
+        head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + gfd.mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + gfd.mipSize + 0x20)]
+        return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
+
+    elif struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x01:
         head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
         return head1 + swizzled_data[0] + head2
 
@@ -556,9 +554,9 @@ def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD
             if (tileMode == 0 or tileMode == 1):
                 pos = AddrLib_computeSurfaceAddrFromCoordLinear(x, y, 0, 0, bpp, pitch, height, depth, bitPos)
             elif (tileMode == 2 or tileMode == 3):
-                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, 0, bpp, pitch, height, tileMode, false, 0, 0, bitPos)
+                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, 0, bpp, pitch, height, tileMode, 0, 0, 0, bitPos)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1*1, tileMode, false, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
+                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1*1, tileMode, 0, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
 
             pos_ = (y * width + x) * 4
 
@@ -585,9 +583,9 @@ def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, to
             if (tileMode == 0 or tileMode == 1):
                 pos = AddrLib_computeSurfaceAddrFromCoordLinear(x, y, 0, 0, bpp, pitch, height, depth, bitPos)
             elif (tileMode == 2 or tileMode == 3):
-                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, 0, bpp, pitch, height, tileMode, false, 0, 0, bitPos)
+                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, 0, bpp, pitch, height, tileMode, 0, 0, 0, bitPos)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1, tileMode, false, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
+                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1, tileMode, 0, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
 
             if (format_ == 0x31 or format_ == 0x431):
                 pos_ = (y * width + x) * 8
@@ -822,8 +820,7 @@ def computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch, pSlicesPerT
             bankSwapWidth >>= 1
     return bankSwapWidth
 
-def bankSwapOrder(data):
-    return bytes((data[0], data[1], data[3], data[2]))
+bankSwapOrder = bytes([0, 1, 3, 2])
 
 def AddrLib_getTileType(isDepth):
     return (1 if isDepth != 0 else 0)
@@ -1003,7 +1000,7 @@ def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, slice, sample, bpp, pitc
         if m_banks > 4:
             import pywin.debugger; pywin.debugger.brk() # todo
         bankMask = m_banks-1
-        bank ^= bankSwapOrder(swapIndex & bankMask)
+        bank ^= bankSwapOrder[swapIndex & bankMask]
     p4 = (pipe << numGroupBits)
     p5 = (bank << (numPipeBits + numGroupBits))
     numSwizzleBits = (numBankBits + numPipeBits)

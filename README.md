@@ -1,4 +1,4 @@
-# Wii U GTX Extractor
+# Wii U GTX Extractor v2.2
 Extracts textures from the GFD ('Gfx2' / .gtx file extension) format used in Wii U games.  
   
 Can Also convert .png files into .gtx files!  

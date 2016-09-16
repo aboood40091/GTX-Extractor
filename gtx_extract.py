@@ -428,24 +428,25 @@ def writeGFD(gfd, f):
             for i, tex in enumerate(mipmaps):
                 tex.save('DDSConv/mipmap_%d.png' % i)
 
+            import struct
+
             ddsmipmaps = []
             for i in range(gfd.numMips):
-                print('')
                 if (gfd.format == 0x31 or gfd.format == 0x431):
-                    try:
-                        os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt1 -output DDSConv/mipmap_%d.dds' % i))
-                    except NameError:  # We are using the built exe, not py
-                        os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt1 -output DDSConv/mipmap_%d.dds' % i))
+                    if (struct.calcsize("P") * 8) == 32:
+                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC1 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                    elif (struct.calcsize("P") * 8) == 64:
+                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC1 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                 elif (gfd.format == 0x32 or gfd.format == 0x432):
-                    try:
-                        os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt3 -output DDSConv/mipmap_%d.dds' % i))
-                    except NameError:  # We are using the built exe, not py
-                        os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt3 -output DDSConv/mipmap_%d.dds' % i))
+                    if (struct.calcsize("P") * 8) == 32:
+                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC2 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                    elif (struct.calcsize("P") * 8) == 64:
+                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC2 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                 elif (gfd.format == 0x33 or gfd.format == 0x433):
-                    try:
-                        os.system((os.path.dirname(os.path.abspath(__file__)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
-                    except NameError:  # We are using the built exe, not py
-                        os.system((os.path.dirname(os.path.abspath(sys.executable)) + '/nvdxt.exe -file DDSConv/mipmap_%d.png' % i) + (' -nomipmap -dxt5 -output DDSConv/mipmap_%d.dds' % i))
+                    if (struct.calcsize("P") * 8) == 32:
+                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC3 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                    elif (struct.calcsize("P") * 8) == 64:
+                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC3 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
 
                 with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
                     ddsmipmaps.append(f1.read())

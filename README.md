@@ -5,6 +5,15 @@ Can Also convert .png files into .gtx files!
 
 A bit of work could get it to extract .bflim files, too.
 
+# Requirements:
+Python 3.4 or higher.
+
+PyQt5.
+
+Compressonator.
+
+cx_Freeze. (Optional)
+
 # Credits:
 Treeki - Original GTX Extractor
 

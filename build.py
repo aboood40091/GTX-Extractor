@@ -24,7 +24,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = 'v2.1'
+version = 'v2.2'
 
 # Pick a build directory
 dir_ = 'gtx_extract ' + version

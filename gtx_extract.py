@@ -434,19 +434,19 @@ def writeGFD(gfd, f):
             for i in range(gfd.numMips):
                 if (gfd.format == 0x31 or gfd.format == 0x431):
                     if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC1 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                     elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC1 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                 elif (gfd.format == 0x32 or gfd.format == 0x432):
                     if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC2 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                     elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC2 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                 elif (gfd.format == 0x33 or gfd.format == 0x433):
                     if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC3 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
                     elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC3 -miplevels 0 DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
 
                 with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
                     ddsmipmaps.append(f1.read())

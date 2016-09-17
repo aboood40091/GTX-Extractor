@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v2.2
+# Version v2.2.1
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -24,7 +24,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = 'v2.2'
+version = 'v2.2.1'
 
 # Pick a build directory
 dir_ = 'gtx_extract ' + version
@@ -58,6 +58,23 @@ setup(
     executables = [
         Executable(
             'gtx_extract.py',
+            ),
+        ],
+    )
+
+setup(
+    name = 'gtx_extract_nomipmap',
+    version = version,
+    description = 'Wii U GFD (GTX) extractor',
+    options={
+        'build_exe': {
+            'excludes': excludes,
+            'build_exe': dir_,
+            },
+        },
+    executables = [
+        Executable(
+            'gtx_extract_nomipmap.py',
             ),
         ],
     )

@@ -26,6 +26,8 @@ import os, struct, sys, time
 from PyQt5 import QtCore, QtGui
 Qt = QtCore.Qt
 
+from PIL import Image
+
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2016 AboodXD"
 __credits__ = ["AboodXD", "libtxc_dxtn", "Treeki",
@@ -233,13 +235,13 @@ def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
         time.sleep(5)
         sys.exit(1)
 
-def fetch_2d_texel_rgba_dxt(data, width, height, format_):
+def fetch_2d_texel_rgba_dxt(data, width, height, format_, dataSize):
 
     """
     Does the decompression for DXT compressed images.
     """
 
-    output = bytearray(width * height * 4)
+    output = bytearray(dataSize * 4)
 
     for y in range(height):
         for x in range(width):
@@ -388,14 +390,14 @@ def writePNG(gfd):
 
         else:
             if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
-                result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+                result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
 
                 img = QtGui.QImage(result, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
 
             else:
-                result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+                result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
 
-                output = fetch_2d_texel_rgba_dxt(result, gfd.width, gfd.height, gfd.format)
+                output = fetch_2d_texel_rgba_dxt(result, gfd.width, gfd.height, gfd.format, gfd.dataSize)
 
                 img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
 
@@ -410,51 +412,39 @@ def writePNG(gfd):
 
 def writeGFD(gfd, f):
     # Thanks RoadrunnerWMC
-    mipmaps = []
-    for i in range(gfd.numMips):
-        mipmaps.append(QtGui.QImage(sys.argv[1]).scaledToWidth(gfd.width >> i, Qt.SmoothTransformation))
-
     if gfd.format in formats:
+        im = Image.open(sys.argv[1])
+
         if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
-            data = []
-            for mip in mipmaps:
-                ptr = mip.bits()
-                ptr.setsize(mip.byteCount())
-                data.append(ptr.asstring())
+            data = im.tobytes()
         else:
             if not os.path.isdir('DDSConv'):
                 os.makedirs('DDSConv')
 
-            for i, tex in enumerate(mipmaps):
-                tex.save('DDSConv/mipmap_%d.png' % i)
+            im.save("DDSConv/mipmap.png")
 
             import struct
 
-            ddsmipmaps = []
-            for i in range(gfd.numMips):
-                if (gfd.format == 0x31 or gfd.format == 0x431):
-                    if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                    elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                elif (gfd.format == 0x32 or gfd.format == 0x432):
-                    if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                    elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                elif (gfd.format == 0x33 or gfd.format == 0x433):
-                    if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                    elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
+            if (gfd.format == 0x31 or gfd.format == 0x431):
+                if (struct.calcsize("P") * 8) == 32:
+                    os.system('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap.png DDSConv/mipmap.dds')
+                elif (struct.calcsize("P") * 8) == 64:
+                    os.system('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap.png DDSConv/mipmap.dds')
+            elif (gfd.format == 0x32 or gfd.format == 0x432):
+                if (struct.calcsize("P") * 8) == 32:
+                    os.system('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap.png DDSConv/mipmap.dds')
+                elif (struct.calcsize("P") * 8) == 64:
+                    os.system('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap.png DDSConv/mipmap.dds')
+            elif (gfd.format == 0x33 or gfd.format == 0x433):
+                if (struct.calcsize("P") * 8) == 32:
+                    os.system('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap.png DDSConv/mipmap.dds')
+                elif (struct.calcsize("P") * 8) == 64:
+                    os.system('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap.png DDSConv/mipmap.dds')
 
-                with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
-                    ddsmipmaps.append(f1.read())
-                    f1.close()
+            with open('DDSConv/mipmap.dds', 'rb') as f1:
+                f2 = f1.read()
 
-            data = []
-            for mip in ddsmipmaps:
-                data.append(mip[0x80:])
+            data = f2[0x80:]
 
             for filename in os.listdir('DDSConv'):
                 os.remove(os.path.join('DDSConv', filename))
@@ -467,23 +457,14 @@ def writeGFD(gfd, f):
         sys.exit(1)
 
     swizzled_data = []
-    for i, data in enumerate(data):
-        if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
-            result = swizzle(gfd.width >> i, gfd.height >> i, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
-            swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i) * 4])
-        else:
-            result = swizzle_BC(gfd.width >> i, gfd.height >> i, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
-            swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i)])
+    if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
+        result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
+    else:
+        result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
 
-    # Put the smaller swizzled mips together.
-    swizzled_mips = b''
-    for mip in swizzled_data[1:]:
-        swizzled_mips += mip
-    correctLen = gfd.mipSize
-    swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
-    assert len(swizzled_mips) == correctLen
+    swizzled_data.append(result[:gfd.dataSize])
 
-    # Put it together into a proper GTX.
+    # Put it together into a proper .gtx file.
     pos = 0
 
     header = GFDHeader()
@@ -493,7 +474,7 @@ def writeGFD(gfd, f):
 
     real = False
 
-    while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
+    while pos < len(f): # Loop through the entire file.
         block = GFDBlockHeader()
         block.data(f, pos)
 
@@ -524,26 +505,15 @@ def writeGFD(gfd, f):
         time.sleep(5)
         sys.exit(1)
 
-    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x02:
-        pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
-        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
-        head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + gfd.mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + gfd.mipSize + 0x20)]
-        return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
-
-    elif struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x01:
-        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
-        return head1 + swizzled_data[0] + head2
-
-    else:
-        print("")
-        print("Bad .gtx file!")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+    head1 = bytearray(head1)
+    head1[0x50:0x54] = bytes(bytearray.fromhex("00000001"))
+    head1[0x68:0x6C] = bytes(bytearray.fromhex("00000000"))
+    head2 = bytes(bytearray.fromhex("424C4B7B00000020000000010000000000000001000000000000000000000000"))
+    return bytes(head1) + swizzled_data[0] + head2
 
 # ----------\/-Start of the swizzling section-\/---------- #
-def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
-    result = bytearray(width * height * 4)
+def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, dataSize, toGFD=False):
+    result = bytearray(dataSize)
 
     for y in range(height):
         for x in range(width):
@@ -568,8 +538,8 @@ def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD
 
     return result
 
-def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
-    result = bytearray(width * height)
+def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, dataSize, toGFD=False):
+    result = bytearray(dataSize)
 
     width = width // 4
     height = height // 4

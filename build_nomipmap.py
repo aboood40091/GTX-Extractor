@@ -27,7 +27,7 @@ from cx_Freeze import setup, Executable
 version = 'v2.2.1'
 
 # Pick a build directory
-dir_ = 'gtx_extract ' + version
+dir_ = 'gtx_extract_nomipmap ' + version
 
 # Add the "build" parameter to the system argument list
 if 'build' not in sys.argv:
@@ -46,7 +46,7 @@ excludes = ['doctest', 'pdb', 'unittest', 'difflib', 'inspect',
     'PyQt5.QtWebKit', 'PyQt5.QtNetwork']
 
 setup(
-    name = 'gtx_extract',
+    name = 'gtx_extract_nomipmap',
     version = version,
     description = 'Wii U GFD (GTX) extractor',
     options={
@@ -57,7 +57,7 @@ setup(
         },
     executables = [
         Executable(
-            'gtx_extract.py',
+            'gtx_extract_nomipmap.py',
             ),
         ],
     )

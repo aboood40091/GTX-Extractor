@@ -14,6 +14,8 @@ Compressonator.
 
 cx_Freeze. (Optional)
 
+Pillow. (If using gtx_extract_nomipmap)
+
 # Credits:
 Treeki - Original GTX Extractor
 

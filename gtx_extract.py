@@ -2,7 +2,7 @@
 
 # GTX Extractor
 # Version v3.0
-# Copyright © 2014 Treeki, 2015-2016 AboodXD
+
 
 # This file is part of GTX Extractor.
 
@@ -192,7 +192,7 @@ def get_deswizzled_data(gfd):
                 format_ = 26
             elif gfd.format == 0x1:
                 format_ = 50
-            elif gfd.format == 0x7:
+            elif gfd.format == 0x7:  # I'm not sure about this, but this is what Random Talking Bush said. :/
                 format_ = 51
             elif (gfd.format == 0x31 or gfd.format == 0x431):
                 format_ = "BC1"
@@ -825,6 +825,11 @@ def AddrLib_computeCmaskInfo(pitchIn, heightIn, numSlices, isLinear, pTileInfo, 
     return returnCode
 
 # ----------\/-Start of DDS writer section-\/---------- #
+
+# Copyright © 2016 AboodXD
+
+# Feel free to include this in your own program if you want, just give credits. :)
+
 def writeHeader(num_mipmaps, w, h, format_, compressed=False):
     hdr = bytearray(128)
 
@@ -882,7 +887,7 @@ def writeHeader(num_mipmaps, w, h, format_, compressed=False):
         rmask = 0x000000ff
         gmask = 0x000000ff
         bmask = 0x000000ff
-        amask = 0x00000000
+        amask = 0x0000ff00
 
     hdr[:4] = b'DDS '
     hdr[4:4+4] = 124 .to_bytes(4, 'little')

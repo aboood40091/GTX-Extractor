@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v2.2.1
+# Version v3.0
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -24,7 +24,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = 'v2.2.1'
+version = 'v3.0'
 
 # Pick a build directory
 dir_ = 'gtx_extract ' + version
@@ -39,19 +39,12 @@ if os.path.isdir(dir_): shutil.rmtree(dir_)
 os.makedirs(dir_)
 print('>> Directory ready!')
 
-# exclude QtWebKit to save space, plus Python stuff we don't use
-excludes = ['doctest', 'pdb', 'unittest', 'difflib', 'inspect',
-    'os2emxpath', 'posixpath', 'optpath', 'locale', 'calendar',
-    'select', 'multiprocessing', 'ssl',
-    'PyQt5.QtWebKit', 'PyQt5.QtNetwork']
-
 setup(
     name = 'gtx_extract',
     version = version,
     description = 'Wii U GFD (GTX) extractor',
     options={
         'build_exe': {
-            'excludes': excludes,
             'build_exe': dir_,
             },
         },
@@ -67,4 +60,4 @@ shutil.copy('COPYING', dir_)
 shutil.copy('README.md', dir_)
 print('>> Files copied!')
 
-print('>> GTX Extractor has been frozen to %s !' % dir_)
+print('>> GTX Extractor has been frozen to %s!' % dir_)

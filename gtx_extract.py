@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # GTX Extractor
-# Version v2.2.1
+# Version v3.0
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -19,16 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""gtx_extract.py: Decode GFD (GTX/GSH) images."""
+"""gtx_extract.py: Decode GFD (GTX) images."""
 
 import os, struct, sys, time
 
-from PyQt5 import QtCore, QtGui
-Qt = QtCore.Qt
-
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2016 AboodXD"
-__credits__ = ["AboodXD", "libtxc_dxtn", "Treeki",
+__credits__ = ["AboodXD", "Treeki", "AddrLib",
                     "Exzap", "RoadrunnerWMC"]
 
 formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
@@ -42,227 +39,17 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x0000000a: 'GX2_SURFACE_FORMAT_TC_R5_G5_B5_A1_UNORM',
            0x0000000b: 'GX2_SURFACE_FORMAT_TC_R4_G4_B4_A4_UNORM',
            0x00000001: 'GX2_SURFACE_FORMAT_TC_R8_UNORM',
+           0x00000007: 'GX2_SURFACE_FORMAT_TC_R8_G8_UNORM',
            0x00000031: 'GX2_SURFACE_FORMAT_T_BC1_UNORM',
            0x00000431: 'GX2_SURFACE_FORMAT_T_BC1_SRGB',
            0x00000032: 'GX2_SURFACE_FORMAT_T_BC2_UNORM',
            0x00000432: 'GX2_SURFACE_FORMAT_T_BC2_SRGB',
            0x00000033: 'GX2_SURFACE_FORMAT_T_BC3_UNORM',
-           0x00000433: 'GX2_SURFACE_FORMAT_T_BC3_SRGB'
+           0x00000433: 'GX2_SURFACE_FORMAT_T_BC3_SRGB',
+           0x00000034: 'GX2_SURFACE_FORMAT_T_BC4_UNORM',
+           0x00000035: 'GX2_SURFACE_FORMAT_T_BC5_UNORM'
            }
 
-m_banks = 4
-m_banksBitcount = 2
-m_pipes = 2
-m_pipesBitcount = 1
-m_pipeInterleaveBytes = 256
-m_pipeInterleaveBytesBitcount = 8
-m_rowSize = 2048
-m_swapSize = 256
-m_splitSize = 2048
-
-m_chipFamily = 2
-
-# ----------\/-Start of libtxc_dxtn section-\/---------- #
-def EXP5TO8R(packedcol):
-    return int((((packedcol) >> 8) & 0xf8) | (((packedcol) >> 13) & 0x07))
-
-def EXP6TO8G(packedcol):
-    return int((((packedcol) >> 3) & 0xfc) | (((packedcol) >>  9) & 0x03))
-
-def EXP5TO8B(packedcol):
-    return int((((packedcol) << 3) & 0xf8) | (((packedcol) >>  2) & 0x07))
-
-def EXP4TO8(col):
-    return int((col) | ((col) << 4))
-
-# inefficient. To be efficient, it would be necessary to decode 16 pixels at once
-
-def dxt135_decode_imageblock(pixdata, img_block_src, i, j, dxt_type):
-    color0 = pixdata[img_block_src] | (pixdata[img_block_src + 1] << 8)
-    color1 = pixdata[img_block_src + 2] | (pixdata[img_block_src + 3] << 8)
-    bits = pixdata[img_block_src + 4] | (pixdata[img_block_src + 5] << 8) | (pixdata[img_block_src + 6] << 16) | (pixdata[img_block_src + 7] << 24)
-    # What about big/little endian?
-    bit_pos = 2 * (j * 4 + i)
-    code = (bits >> bit_pos) & 3
-
-    ACOMP = 255
-    if code == 0:
-        RCOMP = EXP5TO8R(color0)
-        GCOMP = EXP6TO8G(color0)
-        BCOMP = EXP5TO8B(color0)
-    elif code == 1:
-        RCOMP = EXP5TO8R(color1)
-        GCOMP = EXP6TO8G(color1)
-        BCOMP = EXP5TO8B(color1)
-    elif code == 2:
-        if (dxt_type > 1) or (color0 > color1):
-            RCOMP = ((EXP5TO8R(color0) * 2 + EXP5TO8R(color1)) // 3)
-            GCOMP = ((EXP6TO8G(color0) * 2 + EXP6TO8G(color1)) // 3)
-            BCOMP = ((EXP5TO8B(color0) * 2 + EXP5TO8B(color1)) // 3)
-        else:
-            RCOMP = ((EXP5TO8R(color0) + EXP5TO8R(color1)) // 2)
-            GCOMP = ((EXP6TO8G(color0) + EXP6TO8G(color1)) // 2)
-            BCOMP = ((EXP5TO8B(color0) + EXP5TO8B(color1)) // 2)
-    elif code == 3:
-        if (dxt_type > 1) or (color0 > color1):
-            RCOMP = ((EXP5TO8R(color0) + EXP5TO8R(color1) * 2) // 3)
-            GCOMP = ((EXP6TO8G(color0) + EXP6TO8G(color1) * 2) // 3)
-            BCOMP = ((EXP5TO8B(color0) + EXP5TO8B(color1) * 2) // 3)
-        else:
-            RCOMP = 0
-            GCOMP = 0
-            BCOMP = 0
-            if dxt_type == 1: ACOMP = 0
-    else:
-        # CANNOT happen (I hope)
-        print("")
-        print("Whoops, something went wrong while decompressing...")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-
-    return ACOMP, RCOMP, GCOMP, BCOMP
-
-def fetch_2d_texel_rgb_dxt1(srcRowStride, pixdata, i, j):
-
-    """
-    Extract the (i,j) pixel from pixdata and return it
-    in RCOMP, GCOMP, BCOMP, ACOMP.
-    """
-
-    try:
-        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
-        test = pixdata[blksrc]
-        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 0)
-
-        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
-
-    except IndexError:
-        print("")
-        print("Whoops, something went wrong while decompressing...")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-
-def fetch_2d_texel_rgba_dxt1(srcRowStride, pixdata, i, j):
-
-    """
-    Extract the (i,j) pixel from pixdata and return it
-    in RCOMP, GCOMP, BCOMP, ACOMP.
-    """
-
-    try:
-        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 8
-        test = pixdata[blksrc]
-        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc, i & 3, j & 3, 1)
-
-        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
-
-    except IndexError:
-        print("")
-        print("Whoops, something went wrong while decompressing...")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-
-def fetch_2d_texel_rgba_dxt3(srcRowStride, pixdata, i, j):
-
-    """
-    Extract the (i,j) pixel from pixdata and return it
-    in RCOMP, GCOMP, BCOMP, ACOMP.
-    """
-
-    try:
-        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
-        anibble = (pixdata[blksrc + ((j & 3) * 4 + (i & 3)) // 2] >> (4 * (i & 1))) & 0x0f
-        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
-        ACOMP = EXP4TO8(anibble)
-
-        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
-
-    except IndexError:
-        print("")
-        print("Whoops, something went wrong while decompressing...")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-
-def fetch_2d_texel_rgba_dxt5(srcRowStride, pixdata, i, j):
-
-    """
-    Extract the (i,j) pixel from pixdata and return it
-    in RCOMP, GCOMP, BCOMP, ACOMP.
-    """
-
-    try:
-        blksrc = ((srcRowStride + 3) // 4 * (j // 4) + (i // 4)) * 16
-        alpha0 = pixdata[blksrc]
-        alpha1 = pixdata[blksrc + 1]
-        # TODO test this!
-        bit_pos = ((j & 3) * 4 + (i & 3)) * 3
-        acodelow = pixdata[blksrc + 2 + bit_pos // 8]
-        acodehigh = pixdata[blksrc + 3 + bit_pos // 8]
-        code = (acodelow >> (bit_pos & 0x07) |
-            (acodehigh << (8 - (bit_pos & 0x07)))) & 0x07
-        ACOMP, RCOMP, GCOMP, BCOMP = dxt135_decode_imageblock(pixdata, blksrc + 8, i & 3, j & 3, 2)
-
-        if code == 0:
-            ACOMP = alpha0
-        elif code == 1:
-            ACOMP = alpha1
-        elif alpha0 > alpha1:
-            ACOMP = (alpha0 * (8 - code) + (alpha1 * (code - 1))) // 7
-        elif code < 6:
-            ACOMP = (alpha0 * (6 - code) + (alpha1 * (code - 1))) // 5
-        elif code == 6:
-            ACOMP = 0
-        else:
-            ACOMP = 255
-
-        return bytes([RCOMP, GCOMP, BCOMP, ACOMP])
-
-    except IndexError:
-        print("")
-        print("Whoops, something went wrong while decompressing...")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-
-def fetch_2d_texel_rgba_dxt(data, width, height, format_):
-
-    """
-    Does the decompression for DXT compressed images.
-    """
-
-    output = bytearray(width * height * 4)
-
-    for y in range(height):
-        for x in range(width):
-            if (format_ == 0x31 or format_ == 0x431):
-                try:
-                    outValue = fetch_2d_texel_rgba_dxt1(width, data, x, y)
-                    pos__ = (y * width + x) * 4
-                    output[pos__:pos__ + 4] = outValue
-                except:
-                    outValue = fetch_2d_texel_rgb_dxt1(width, data, x, y)
-                    pos__ = (y * width + x) * 4
-                    output[pos__:pos__ + 4] = outValue
-            elif (format_ == 0x32 or format_ == 0x432):
-                outValue = fetch_2d_texel_rgba_dxt3(width, data, x, y)
-                pos__ = (y * width + x) * 4
-                output[pos__:pos__ + 4] = outValue
-            elif (format_ == 0x33 or format_ == 0x433):
-                outValue = fetch_2d_texel_rgba_dxt5(width, data, x, y)
-                pos__ = (y * width + x) * 4
-                output[pos__:pos__ + 4] = outValue
-
-    return output
-    
 # ----------\/-Start of GFD Extracting section-\/------------- #
 class GFDData():
     width, height = 0, 0
@@ -379,7 +166,7 @@ def readGFD(f):
 
     return gfd
 
-def writePNG(gfd):
+def get_deswizzled_data(gfd):
     if gfd.format in formats:
         if gfd.depth != 1:
             raise NotImplementedError("Unsupported depth!")
@@ -387,17 +174,46 @@ def writePNG(gfd):
             raise ValueError("Invalid texture format!")
 
         else:
-            if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
-                result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+            if gfd.format == 0x823:
+                format_ = 116
+            elif gfd.format == 0x1f:
+                format_ = 36
+            elif gfd.format == 0x820:
+                format_ = 113
+            elif (gfd.format == 0x1a or gfd.format == 0x41a):
+                format_ = 32
+            elif gfd.format == 0x19:
+                format_ = 31
+            elif gfd.format == 0x8:
+                format_ = 23
+            elif gfd.format == 0xa:
+                format_ = 25
+            elif gfd.format == 0xb:
+                format_ = 26
+            elif gfd.format == 0x1:
+                format_ = 50
+            elif gfd.format == 0x7:
+                format_ = 51
+            elif (gfd.format == 0x31 or gfd.format == 0x431):
+                format_ = "BC1"
+            elif (gfd.format == 0x32 or gfd.format == 0x432):
+                format_ = "BC2"
+            elif (gfd.format == 0x33 or gfd.format == 0x433):
+                format_ = "BC3"
+            elif gfd.format == 0x34:
+                format_ = "BC4"
+            elif gfd.format == 0x35:
+                format_ = "BC5"
 
-                img = QtGui.QImage(result, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
+            if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x35):
+                result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
+
+                hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=False)
 
             else:
-                result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+                result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
 
-                output = fetch_2d_texel_rgba_dxt(result, gfd.width, gfd.height, gfd.format)
-
-                img = QtGui.QImage(output, gfd.width, gfd.height, QtGui.QImage.Format_RGBA8888)
+                hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=True)
 
     else:
         print("")
@@ -406,59 +222,13 @@ def writePNG(gfd):
         time.sleep(5)
         sys.exit(1)
 
-    yield img.copy(0, 0, gfd.width, gfd.height)
+    return hdr, result
 
-def writeGFD(gfd, f):
-    # Thanks RoadrunnerWMC
-    mipmaps = []
-    for i in range(gfd.numMips):
-        mipmaps.append(QtGui.QImage(sys.argv[1]).scaledToWidth(gfd.width >> i, Qt.SmoothTransformation))
-
+def writeGFD(gfd, f, f1):
+    # Well, let's credit RoadrunnerWMC anyway :P
     if gfd.format in formats:
-        if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
-            data = []
-            for mip in mipmaps:
-                ptr = mip.bits()
-                ptr.setsize(mip.byteCount())
-                data.append(ptr.asstring())
-        else:
-            if not os.path.isdir('DDSConv'):
-                os.makedirs('DDSConv')
+        data = f1[0x80:0x80 + gfd.dataSize]
 
-            for i, tex in enumerate(mipmaps):
-                tex.save('DDSConv/mipmap_%d.png' % i)
-
-            import struct
-
-            ddsmipmaps = []
-            for i in range(gfd.numMips):
-                if (gfd.format == 0x31 or gfd.format == 0x431):
-                    if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                    elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC1 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                elif (gfd.format == 0x32 or gfd.format == 0x432):
-                    if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                    elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC2 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                elif (gfd.format == 0x33 or gfd.format == 0x433):
-                    if (struct.calcsize("P") * 8) == 32:
-                        os.system(('C:\\"Program Files"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-                    elif (struct.calcsize("P") * 8) == 64:
-                        os.system(('C:\\"Program Files (x86)"\Compressonator\CompressonatorCLI.exe -fd BC3 -nomipmap DDSConv/mipmap_%d.png' % i) + (' DDSConv/mipmap_%d.dds' % i))
-
-                with open('DDSConv/mipmap_%d.dds' % i, 'rb') as f1:
-                    ddsmipmaps.append(f1.read())
-                    f1.close()
-
-            data = []
-            for mip in ddsmipmaps:
-                data.append(mip[0x80:])
-
-            for filename in os.listdir('DDSConv'):
-                os.remove(os.path.join('DDSConv', filename))
-            import shutil; shutil.rmtree('DDSConv')
     else:
         print("")
         print("Unsupported texture format: " + hex(gfd.format))
@@ -467,23 +237,14 @@ def writeGFD(gfd, f):
         sys.exit(1)
 
     swizzled_data = []
-    for i, data in enumerate(data):
-        if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433):
-            result = swizzle(gfd.width >> i, gfd.height >> i, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
-            swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i) * 4])
-        else:
-            result = swizzle_BC(gfd.width >> i, gfd.height >> i, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
-            swizzled_data.append(result[:(gfd.width >> i) * (gfd.height >> i)])
+    if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x35):
+        result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
+    else:
+        result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
 
-    # Put the smaller swizzled mips together.
-    swizzled_mips = b''
-    for mip in swizzled_data[1:]:
-        swizzled_mips += mip
-    correctLen = gfd.mipSize
-    swizzled_mips += b'\0' * (correctLen - len(swizzled_mips))
-    assert len(swizzled_mips) == correctLen
+    swizzled_data.append(result[:gfd.dataSize])
 
-    # Put it together into a proper GTX.
+    # Put it together into a proper .gtx file.
     pos = 0
 
     header = GFDHeader()
@@ -493,18 +254,16 @@ def writeGFD(gfd, f):
 
     real = False
 
-    while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
+    while pos < len(f): # Loop through the entire file.
         block = GFDBlockHeader()
         block.data(f, pos)
 
         pos += block.size
 
         if block.type_ == 0x0B:
-            surface = GFDSurface()
-            surface.data(f, pos)
+            offset = pos
 
-            pos += surface.size
-            pos += (23 * 4)
+            pos += block.dataSize
 
         elif block.type_ == 0x0C:
             head1 = f[:pos] # it works :P
@@ -524,26 +283,15 @@ def writeGFD(gfd, f):
         time.sleep(5)
         sys.exit(1)
 
-    if struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x02:
-        pad = struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x14):(len(head1) + gfd.dataSize + 0x18)])[0]
-        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20)]
-        head3 = f[(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + gfd.mipSize):(len(head1) + gfd.dataSize + 0x20 + pad + 0x20 + gfd.mipSize + 0x20)]
-        return head1 + swizzled_data[0] + head2 + swizzled_mips + head3
-
-    elif struct.unpack(">I", f[(len(head1) + gfd.dataSize + 0x10):(len(head1) + gfd.dataSize + 0x14)])[0] == 0x01:
-        head2 = f[(len(head1) + gfd.dataSize):(len(head1) + gfd.dataSize + 0x20)]
-        return head1 + swizzled_data[0] + head2
-
-    else:
-        print("")
-        print("Bad .gtx file!")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+    head1 = bytearray(head1)
+    head1[offset + 0x10:offset + 0x14] = bytes(bytearray.fromhex("00000001"))
+    head1[offset + 0x28:offset + 0x2C] = bytes(bytearray.fromhex("00000000"))
+    head2 = bytes(bytearray.fromhex("424C4B7B00000020000000010000000000000001000000000000000000000000"))
+    return bytes(head1) + swizzled_data[0] + head2
 
 # ----------\/-Start of the swizzling section-\/---------- #
-def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
-    result = bytearray(width * height * 4)
+def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, dataSize, toGFD=False):
+    result = bytearray(dataSize)
 
     for y in range(height):
         for x in range(width):
@@ -562,14 +310,14 @@ def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD
             pos_ = (y * width + x) * 4
 
             if toGFD:
-                result[pos:pos + 4] = swapRB(data[pos_:pos_ + 4])
+                result[pos:pos + 4] = data[pos_:pos_ + 4]
             else:
                 result[pos_:pos_ + 4] = data[pos:pos + 4]
 
     return result
 
-def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
-    result = bytearray(width * height)
+def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, dataSize, toGFD=False):
+    result = bytearray(dataSize)
 
     width = width // 4
     height = height // 4
@@ -607,6 +355,18 @@ def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, to
 
 # I'd like to give a huge thanks to Exzap for this,
 # Thanks Exzap!
+
+m_banks = 4
+m_banksBitcount = 2
+m_pipes = 2
+m_pipesBitcount = 1
+m_pipeInterleaveBytes = 256
+m_pipeInterleaveBytesBitcount = 8
+m_rowSize = 2048
+m_swapSize = 256
+m_splitSize = 2048
+
+m_chipFamily = 2
 
 formatHwInfo = b"\x00\x00\x00\x01\x08\x03\x00\x01\x08\x01\x00\x01\x00\x00\x00\x01" \
     b"\x00\x00\x00\x01\x10\x07\x00\x00\x10\x03\x00\x01\x10\x03\x00\x01" \
@@ -817,7 +577,7 @@ def computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch, pSlicesPerT
         else:
             v8 = swapMax
         bankSwapWidth = v8
-        while bankSwapWidth >= (2 * pitch): # Let's wish this works :P
+        while (bankSwapWidth > (2 * pitch) or bankSwapWidth == (2 * pitch)): # Let's wish this works :P
             bankSwapWidth >>= 1
     return bankSwapWidth
 
@@ -1064,11 +824,146 @@ def AddrLib_computeCmaskInfo(pitchIn, heightIn, numSlices, isLinear, pTileInfo, 
     pBlockMax = blockMax
     return returnCode
 
+# ----------\/-Start of DDS writer section-\/---------- #
+def writeHeader(num_mipmaps, w, h, format_, compressed=False):
+    hdr = bytearray(128)
+
+    if format_ == 116:
+        fourcc = 116 .to_bytes(4, 'little')
+    elif format_ == 36:
+        fourcc = 36 .to_bytes(4, 'little')
+    elif format_ == 113:
+        fourcc = 113 .to_bytes(4, 'little')
+    elif format_ == 32:
+        fmtbpp = 4
+        has_alpha = 1
+        rmask = 0x000000ff
+        gmask = 0x0000ff00
+        bmask = 0x00ff0000
+        amask = 0xff000000
+    elif format_ == 31:
+        fmtbpp = 4
+        has_alpha = 1
+        rmask = 0x000003ff
+        gmask = 0x000ffc00
+        bmask = 0x3ff00000
+        amask = 0xc0000000
+    elif format_ == 23:
+        fmtbpp = 2
+        has_alpha = 0
+        rmask = 0x0000f800
+        gmask = 0x000007e0
+        bmask = 0x0000001f
+        amask = 0x00000000
+    elif format_ == 25:
+        fmtbpp = 2
+        has_alpha = 1
+        rmask = 0x00007c00
+        gmask = 0x000003e0
+        bmask = 0x0000001f
+        amask = 0x00008000
+    elif format_ == 26:
+        fmtbpp = 2
+        has_alpha = 1
+        rmask = 0x00000f00
+        gmask = 0x000000f0
+        bmask = 0x0000000f
+        amask = 0x0000f000
+    elif format_ == 50:
+        fmtbpp = 1
+        has_alpha = 0
+        rmask = 0x000000ff
+        gmask = 0x000000ff
+        bmask = 0x000000ff
+        amask = 0x00000000
+    elif format_ == 51:
+        fmtbpp = 2
+        has_alpha = 1
+        rmask = 0x000000ff
+        gmask = 0x000000ff
+        bmask = 0x000000ff
+        amask = 0x00000000
+
+    hdr[:4] = b'DDS '
+    hdr[4:4+4] = 124 .to_bytes(4, 'little')
+    hdr[12:12+4] = h.to_bytes(4, 'little')
+    hdr[16:16+4] = w.to_bytes(4, 'little')
+    hdr[76:76+4] = 32 .to_bytes(4, 'little')
+
+    if not compressed:
+        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
+        hdr[92:92+4] = rmask.to_bytes(4, 'little')
+        hdr[96:96+4] = gmask.to_bytes(4, 'little')
+        hdr[100:100+4] = bmask.to_bytes(4, 'little')
+        hdr[104:104+4] = amask.to_bytes(4, 'little')
+
+    flags = (0x00000001) | (0x00001000) | (0x00000004) | (0x00000002)
+
+    caps = (0x00001000)
+
+    if num_mipmaps != 1:
+        flags |= (0x00020000)
+        caps |= ((0x00000008) | (0x00400000))
+    elif num_mipmaps == 0: # This shouldn't be happening... :/
+        num_mipmaps = 1
+
+    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
+    hdr[108:108+4] = caps.to_bytes(4, 'little')
+
+    if not compressed:
+        flags |= (0x00000008)
+
+        if format_ == 28:
+            pflags = (0x00000002)
+        elif (format_ == 36 or format_ == 113 or format_ == 116):
+            pflags = (0x00000004)
+        else:
+            if (((fmtbpp == 1) or (format_ == 51)) and (format_ != 27)):
+                pflags = (0x00020000)
+            else:
+                pflags = (0x00000040)
+
+        if has_alpha != 0:
+            pflags |= (0x00000001)
+
+        hdr[8:8+4] = flags.to_bytes(4, 'little')
+        hdr[20:20+4] = (w * fmtbpp).to_bytes(4, 'little') # pitch
+        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+
+    else:
+        flags |= (0x00080000)
+        pflags = (0x00000004)
+
+        if format_ == "BC1":
+            fourcc = b'DXT1'
+        elif format_ == "BC2":
+            fourcc = b'DXT3'
+        elif format_ == "BC3":
+            fourcc = b'DXT5'
+        elif format_ == "BC4":
+            fourcc = b'ATI1'
+        elif format_ == "BC5":
+            fourcc = b'ATI2'
+
+        hdr[8:8+4] = flags.to_bytes(4, 'little')
+        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+        hdr[84:84+4] = fourcc
+
+        size = ((w + 3) >> 2) * ((h + 3) >> 2)
+        if (format_ == "BC1" or format_ == "BC4"):
+            size *= 8
+        else:
+            size *= 16
+
+        hdr[20:20+4] = size.to_bytes(4, 'little') # linear size
+
+    return hdr
+
 def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v2.2.1")
+    print("GTX Extractor v3.0")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:
@@ -1088,11 +983,14 @@ def main():
             print('Converting: ' + sys.argv[1])
             inb = inf.read()
             inf.close()
-    elif sys.argv[1].endswith('.png'):
+    elif sys.argv[1].endswith('.dds'):
         with open(sys.argv[2], "rb") as inf:
-            print('Converting: ' + sys.argv[1])
-            inb = inf.read()
-            inf.close()
+            with open(sys.argv[1], "rb") as img:
+                print('Converting: ' + sys.argv[1])
+                inb = inf.read()
+                img1 = img.read()
+                inf.close()
+                img.close()
     
     data = readGFD(inb)
 
@@ -1119,17 +1017,21 @@ def main():
     name = os.path.splitext(sys.argv[1])[0]
 
     if sys.argv[1].endswith('.gtx'):
-        for img in writePNG(data):
-            img.save(name + ".png")
-            print('')
-            print('Finished converting: ' + sys.argv[1])
+        hdr, data = get_deswizzled_data(data)
 
-    elif sys.argv[1].endswith('.png'):
+        output = open(name + '.dds', 'wb+')
+        output.write(hdr)
+        output.write(data)
+        output.close()
+        print('')
+        print('Finished converting: ' + sys.argv[1])
+
+    elif sys.argv[1].endswith('.dds'):
         if os.path.isfile(name + ".gtx"):
             output = open(name + "2.gtx", 'wb+')
         else:
             output = open(name + ".gtx", 'wb+')
-        output.write(writeGFD(data, inb))
+        output.write(writeGFD(data, inb, img1))
         output.close()
         print('')
         print('Finished converting: ' + sys.argv[1])

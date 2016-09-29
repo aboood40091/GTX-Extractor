@@ -172,27 +172,29 @@ def readGFD(f):
         else:
             pos += block.dataSize
 
-    if (not blockB and not blockC):
-        print("")
-        print("No Image was found in this file.")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-    elif (blockB and not blockC):
-        print("")
-        print("Image info was found but no Image data was found.")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
-    elif (not blockB and blockC):
-        print("")
-        print("Image data was found but no Image info was found.")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+    if blockB:
+        if not blockC:
+            print("")
+            print("Image info was found but no Image data was found.")
+            print("")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+    if not blockB:
+        if not blockC:
+            print("")
+            print("No Image was found in this file.")
+            print("")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+        elif blockC:
+            print("")
+            print("Image data was found but no Image info was found.")
+            print("")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
 
     return gfd
 

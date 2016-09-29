@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v3.1
+# Version v3.2
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -48,7 +48,9 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x00000033: 'GX2_SURFACE_FORMAT_T_BC3_UNORM',
            0x00000433: 'GX2_SURFACE_FORMAT_T_BC3_SRGB',
            0x00000034: 'GX2_SURFACE_FORMAT_T_BC4_UNORM',
-           0x00000035: 'GX2_SURFACE_FORMAT_T_BC5_UNORM'
+           0x00000234: 'GX2_SURFACE_FORMAT_T_BC4_SNORM',
+           0x00000035: 'GX2_SURFACE_FORMAT_T_BC5_UNORM',
+           0x00000235: 'GX2_SURFACE_FORMAT_T_BC5_SNORM'
            }
 
 # ----------\/-Start of GFD Extracting section-\/------------- #
@@ -233,11 +235,15 @@ def get_deswizzled_data(gfd):
             elif (gfd.format == 0x33 or gfd.format == 0x433):
                 format_ = "BC3"
             elif gfd.format == 0x34:
-                format_ = "BC4"
+                format_ = "BC4U"
+            elif gfd.format == 0x234:
+                format_ = "BC4S"
             elif gfd.format == 0x35:
-                format_ = "BC5"
+                format_ = "BC5U"
+            elif gfd.format == 0x235:
+                format_ = "BC5S"
 
-            if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x35):
+            if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x234 and gfd.format != 0x35 and gfd.format != 0x235):
                 result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
 
                 hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=False)
@@ -269,7 +275,7 @@ def writeGFD(gfd, f, f1):
         sys.exit(1)
 
     swizzled_data = []
-    if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x35):
+    if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x234 and gfd.format != 0x35 and gfd.format != 0x235):
         result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
     else:
         result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
@@ -964,10 +970,14 @@ def writeHeader(num_mipmaps, w, h, format_, compressed=False):
             fourcc = b'DXT3'
         elif format_ == "BC3":
             fourcc = b'DXT5'
-        elif format_ == "BC4":
-            fourcc = b'ATI1'
-        elif format_ == "BC5":
+        elif format_ == "BC4U":
+            fourcc = b'BC4U'
+        elif format_ == "BC4S":
+            fourcc = b'BC4S'
+        elif format_ == "BC5U":
             fourcc = b'ATI2'
+        elif format_ == "BC5S":
+            fourcc = b'BC5S'
 
         hdr[8:8+4] = flags.to_bytes(4, 'little')
         hdr[80:80+4] = pflags.to_bytes(4, 'little')
@@ -987,7 +997,7 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v3.1")
+    print("GTX Extractor v3.2")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:

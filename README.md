@@ -1,9 +1,7 @@
-# Wii U GTX Extractor v3.0
-Extracts textures from the GFD ('Gfx2' / .gtx file extension) format used in Wii U games, and save them as DDS.  
+# Wii U GTX Extractor v3.2
+Extracts textures from the GFD ('Gfx2' / .gtx file extension) format used in Wii U games, and saves them as DDS.  
   
 Can Also convert DDS files into .gtx files!  
-
-A bit of work could get it to extract .bflim files, too.
 
 # Requirements:
 Python 3.4 or higher.

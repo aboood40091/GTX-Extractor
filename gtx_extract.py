@@ -124,6 +124,9 @@ def readGFD(f):
 
     pos += header.size
 
+    blockB = False
+    blockC = False
+
     while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
         block = GFDBlockHeader()
         block.data(f, pos)
@@ -132,9 +135,6 @@ def readGFD(f):
             raise ValueError("Invalid block header!")
 
         pos += block.size
-
-        blockB = False
-        blockC = False
 
         if block.type_ == 0x0B:
             blockB = True

@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v3.0
+# Version v3.1
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -24,7 +25,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = 'v3.0'
+version = 'v3.1'
 
 # Pick a build directory
 dir_ = 'gtx_extract ' + version

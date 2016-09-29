@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v3.0
-
+# Version v3.1
+# Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -132,7 +133,12 @@ def readGFD(f):
 
         pos += block.size
 
+        blockB = False
+        blockC = False
+
         if block.type_ == 0x0B:
+            blockB = True
+
             surface = GFDSurface()
             surface.data(f, pos)
 
@@ -157,12 +163,36 @@ def readGFD(f):
             gfd.pitch = surface.pitch
 
         elif block.type_ == 0x0C:
+            blockC = True
+
             gfd.dataSize = block.dataSize
             gfd.data = f[pos:pos + block.dataSize]
             pos += block.dataSize
 
         else:
             pos += block.dataSize
+
+    if (not blockB and not blockC):
+        print("")
+        print("No Image was found in this file.")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+    elif (blockB and not blockC):
+        print("")
+        print("Image info was found but no Image data was found.")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
+    elif (not blockB and blockC):
+        print("")
+        print("Image data was found but no Image info was found.")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
     return gfd
 
@@ -252,8 +282,6 @@ def writeGFD(gfd, f, f1):
     
     pos += header.size
 
-    real = False
-
     while pos < len(f): # Loop through the entire file.
         block = GFDBlockHeader()
         block.data(f, pos)
@@ -268,20 +296,9 @@ def writeGFD(gfd, f, f1):
         elif block.type_ == 0x0C:
             head1 = f[:pos] # it works :P
             pos += block.dataSize
-        
-        elif block.type_ == 0x02:
-            real = True
-            pos += block.dataSize
 
         else:
             pos += block.dataSize
-
-    if not real: # Crappy generated .gtx file :/
-        print("")
-        print("This program doesn't support creating a .gtx file of this type!!")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
 
     head1 = bytearray(head1)
     head1[offset + 0x10:offset + 0x14] = bytes(bytearray.fromhex("00000001"))
@@ -759,7 +776,7 @@ def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, slice, sample, bpp, pitc
         bankSwapWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch, 0)
         swapIndex = macroTilePitch * macroTileIndexX // bankSwapWidth
         if m_banks > 4:
-            import pywin.debugger; pywin.debugger.brk() # todo
+            raise ValueError("TODO.")
         bankMask = m_banks-1
         bank ^= bankSwapOrder[swapIndex & bankMask]
     p4 = (pipe << numGroupBits)
@@ -800,7 +817,7 @@ def AddrLib_computeCmaskInfo(pitchIn, heightIn, numSlices, isLinear, pTileInfo, 
     cacheBits = 1024
     returnCode = 0
     if isLinear != 0:
-        import pywin.debugger; pywin.debugger.brk()
+        raise ValueError("Invalid isLinear value!")
     else:
         addrLib_computeTileDataWidthAndHeight(bpp, cacheBits, pTileInfo, macroWidth, macroHeight)
     pPitchOut = ~(macroWidth - 1) & (pitchIn + macroWidth - 1)
@@ -968,7 +985,7 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v3.0")
+    print("GTX Extractor v3.1")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:

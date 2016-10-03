@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v3.2
+# Version v3.3
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -244,12 +244,16 @@ def get_deswizzled_data(gfd):
                 format_ = "BC5S"
 
             if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x234 and gfd.format != 0x35 and gfd.format != 0x235):
-                result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
+                result = swizzle(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+
+                assert len(result) == gfd.dataSize
 
                 hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=False)
 
             else:
-                result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data, gfd.dataSize)
+                result = swizzle_BC(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+
+                assert len(result) == gfd.dataSize
 
                 hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=True)
 
@@ -276,11 +280,13 @@ def writeGFD(gfd, f, f1):
 
     swizzled_data = []
     if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x234 and gfd.format != 0x35 and gfd.format != 0x235):
-        result = swizzle(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
+        result = swizzle(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
     else:
-        result = swizzle_BC(gfd.width, gfd.height, gfd.depth, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, gfd.dataSize, True)
+        result = swizzle_BC(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
 
-    swizzled_data.append(result[:gfd.dataSize])
+    assert len(result) == gfd.dataSize
+
+    swizzled_data.append(result)
 
     # Put it together into a proper .gtx file.
     pos = 0
@@ -315,8 +321,8 @@ def writeGFD(gfd, f, f1):
     return bytes(head1) + swizzled_data[0] + head2
 
 # ----------\/-Start of the swizzling section-\/---------- #
-def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, dataSize, toGFD=False):
-    result = bytearray(dataSize)
+def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
+    result = bytearray(data)
 
     for y in range(height):
         for x in range(width):
@@ -332,17 +338,19 @@ def swizzle(width, height, depth, format_, tileMode, swizzle, pitch, data, dataS
             else:
                 pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1*1, tileMode, 0, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
 
-            pos_ = (y * width + x) * 4
+            bpp //= 8
+
+            pos_ = (y * width + x) * bpp
 
             if toGFD:
-                result[pos:pos + 4] = data[pos_:pos_ + 4]
+                result[pos:pos + bpp] = data[pos_:pos_ + bpp]
             else:
-                result[pos_:pos_ + 4] = data[pos:pos + 4]
+                result[pos_:pos_ + bpp] = data[pos:pos + bpp]
 
     return result
 
-def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, dataSize, toGFD=False):
-    result = bytearray(dataSize)
+def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, toGFD=False):
+    result = bytearray(data)
 
     width = width // 4
     height = height // 4
@@ -361,7 +369,7 @@ def swizzle_BC(width, height, depth, format_, tileMode, swizzle, pitch, data, da
             else:
                 pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, 0, 0, bpp, pitch, height, 1, tileMode, 0, 0, 0, pipeSwizzle, bankSwizzle, bitPos)
 
-            if (format_ == 0x31 or format_ == 0x431):
+            if (format_ == 0x31 or format_ == 0x431 or format_ == 0x34 or format_ == 0x234):
                 pos_ = (y * width + x) * 8
 
                 if toGFD:
@@ -935,6 +943,9 @@ def writeHeader(num_mipmaps, w, h, format_, compressed=False):
         flags |= (0x00020000)
         caps |= ((0x00000008) | (0x00400000))
     elif num_mipmaps == 0: # This shouldn't be happening... :/
+        print('')
+        print('Invalid num_mipmaps value: 0')
+        print('Changing value to 1 and continuing...')
         num_mipmaps = 1
 
     hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
@@ -997,16 +1008,16 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v3.2")
+    print("GTX Extractor v3.3")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:
         if len(sys.argv) != 3:
             print("")
-            print("Usage (If converting from .gtx to .png, and using source code): python gtx_extract.py input")
-            print("Usage (If converting from .gtx to .png, and using exe): gtx_extract.exe input")
-            print("Usage (If converting from .png to .gtx, and using source code): python gtx_extract.py input(.png) input(.gtx)")
-            print("Usage (If converting from .png to .gtx, and using exe): gtx_extract.exe input(.png) input(.gtx)")
+            print("Usage (If converting from .gtx to .dds, and using source code): python gtx_extract.py input")
+            print("Usage (If converting from .gtx to .dds, and using exe): gtx_extract.exe input")
+            print("Usage (If converting from .dds to .gtx, and using source code): python gtx_extract.py input(.dds) input(.gtx)")
+            print("Usage (If converting from .dds to .gtx, and using exe): gtx_extract.exe input(.dds) input(.gtx)")
             print("")
             print("Exiting in 5 seconds...")
             time.sleep(5)
@@ -1017,6 +1028,7 @@ def main():
             print('Converting: ' + sys.argv[1])
             inb = inf.read()
             inf.close()
+
     elif sys.argv[1].endswith('.dds'):
         with open(sys.argv[2], "rb") as inf:
             with open(sys.argv[1], "rb") as img:

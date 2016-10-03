@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v3.2
+# Version v3.3
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -25,10 +25,10 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = 'v3.2'
+version = '3.3'
 
 # Pick a build directory
-dir_ = 'gtx_extract ' + version
+dir_ = 'gtx_extract v' + version
 
 # Add the "build" parameter to the system argument list
 if 'build' not in sys.argv:
@@ -41,12 +41,15 @@ os.makedirs(dir_)
 print('>> Directory ready!')
 
 setup(
-    name = 'gtx_extract',
+    name = 'GTX Extractor',
     version = version,
-    description = 'Wii U GFD (GTX) extractor',
+    description = 'Wii U GFD (GTX) Extractor',
+    author = "AboodXD",
     options={
         'build_exe': {
+            'compressed': 1,
             'build_exe': dir_,
+            'icon': 'icon.ico',
             },
         },
     executables = [
@@ -61,4 +64,4 @@ shutil.copy('COPYING', dir_)
 shutil.copy('README.md', dir_)
 print('>> Files copied!')
 
-print('>> GTX Extractor has been frozen to %s!' % dir_)
+print('>> GTX Extractor has been frozen to "%s"!' % dir_)

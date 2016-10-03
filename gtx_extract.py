@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""gtx_extract.py: Decode GFD (GTX) images."""
+"""gtx_extract.py: Decode GTX images."""
 
 import os, struct, sys, time
 
@@ -53,7 +53,7 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x00000235: 'GX2_SURFACE_FORMAT_T_BC5_SNORM'
            }
 
-# ----------\/-Start of GFD Extracting section-\/------------- #
+# ----------\/-Start of GTX Extracting section-\/------------- #
 class GFDData():
     width, height = 0, 0
     format = 0

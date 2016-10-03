@@ -43,7 +43,7 @@ print('>> Directory ready!')
 setup(
     name = 'GTX Extractor',
     version = version,
-    description = 'Wii U GFD (GTX) Extractor',
+    description = 'Wii U GTX Extractor',
     author = "AboodXD",
     options={
         'build_exe': {

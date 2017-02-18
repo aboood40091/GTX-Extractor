@@ -1,4 +1,4 @@
-# Wii U GTX Extractor v3.3
+# GTX Extractor v4.0
 Extracts textures from the GX2 Texture ('Gfx2' / .gtx file extension) format used in Wii U games, and saves them as DDS.  
   
 Can Also convert DDS files into .gtx files!  

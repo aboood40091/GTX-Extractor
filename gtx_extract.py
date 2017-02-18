@@ -1100,7 +1100,7 @@ def main():
     data = readGFD(inb)
     
     for i in range(data.numImages):
-        data = readGFD(inb)
+        data = readGFD(inb) # Yes, I make it re-read the file multiple times due to memory issues
         
         print("")
         print("// ----- GX2Surface Info ----- ")

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v3.3
+# Version v4.0
 # Copyright © 2014 Treeki, 2015-2016 AboodXD
 
 # This file is part of GTX Extractor.
@@ -41,6 +41,7 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x0000000b: 'GX2_SURFACE_FORMAT_TC_R4_G4_B4_A4_UNORM',
            0x00000001: 'GX2_SURFACE_FORMAT_TC_R8_UNORM',
            0x00000007: 'GX2_SURFACE_FORMAT_TC_R8_G8_UNORM',
+           0x00000002: 'GX2_SURFACE_FORMAT_TC_R4_G4_UNORM',
            0x00000031: 'GX2_SURFACE_FORMAT_T_BC1_UNORM',
            0x00000431: 'GX2_SURFACE_FORMAT_T_BC1_SRGB',
            0x00000032: 'GX2_SURFACE_FORMAT_T_BC2_UNORM',
@@ -129,6 +130,29 @@ def readGFD(f):
     blockB = False
     blockC = False
 
+    images = 0
+    imgInfo = 0
+
+    gfd.dim = []
+    gfd.width = []
+    gfd.height = []
+    gfd.depth = []
+    gfd.numMips = []
+    gfd.format = []
+    gfd.aa = []
+    gfd.use = []
+    gfd.imageSize = []
+    gfd.imagePtr = []
+    gfd.mipSize = []
+    gfd.mipPtr = []
+    gfd.tileMode = []
+    gfd.swizzle = []
+    gfd.alignment = []
+    gfd.pitch = []
+
+    gfd.dataSize = []
+    gfd.data = []
+
     while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
         block = GFDBlockHeader()
         block.data(f, pos)
@@ -139,6 +163,7 @@ def readGFD(f):
         pos += block.size
 
         if block.type_ == 0x0B:
+            imgInfo += 1
             blockB = True
 
             surface = GFDSurface()
@@ -147,32 +172,41 @@ def readGFD(f):
             pos += surface.size
             pos += (23 * 4)
 
-            gfd.dim = surface.dim
-            gfd.width = surface.width
-            gfd.height = surface.height
-            gfd.depth = surface.depth
-            gfd.numMips = surface.numMips
-            gfd.format = surface.format_
-            gfd.aa = surface.aa
-            gfd.use = surface.use
-            gfd.imageSize = surface.imageSize
-            gfd.imagePtr = surface.imagePtr
-            gfd.mipSize = surface.mipSize
-            gfd.mipPtr = surface.mipPtr
-            gfd.tileMode = surface.tileMode
-            gfd.swizzle = surface.swizzle
-            gfd.alignment = surface.alignment
-            gfd.pitch = surface.pitch
+            gfd.dim.append(surface.dim)
+            gfd.width.append(surface.width)
+            gfd.height.append(surface.height)
+            gfd.depth.append(surface.depth)
+            gfd.numMips.append(surface.numMips)
+            gfd.format.append(surface.format_)
+            gfd.aa.append(surface.aa)
+            gfd.use.append(surface.use)
+            gfd.imageSize.append(surface.imageSize)
+            gfd.imagePtr.append(surface.imagePtr)
+            gfd.mipSize.append(surface.mipSize)
+            gfd.mipPtr.append(surface.mipPtr)
+            gfd.tileMode.append(surface.tileMode)
+            gfd.swizzle.append(surface.swizzle)
+            gfd.alignment.append(surface.alignment)
+            gfd.pitch.append(surface.pitch)
 
         elif block.type_ == 0x0C:
+            images += 1
             blockC = True
 
-            gfd.dataSize = block.dataSize
-            gfd.data = f[pos:pos + block.dataSize]
+            gfd.dataSize.append(block.dataSize)
+            gfd.data.append(f[pos:pos + block.dataSize])
             pos += block.dataSize
 
         else:
             pos += block.dataSize
+
+    if images != imgInfo:
+        print("")
+        print("Whoops, fail! XD")
+        print("")
+        print("Exiting in 5 seconds...")
+        time.sleep(5)
+        sys.exit(1)
 
     if blockB:
         if not blockC:
@@ -198,93 +232,108 @@ def readGFD(f):
             time.sleep(5)
             sys.exit(1)
 
+    gfd.numImages = images
+
     return gfd
 
-def get_deswizzled_data(gfd):
-    if gfd.format in formats:
-        if gfd.depth != 1:
+def get_deswizzled_data(i, numImages, width, height, depth, format_, tileMode, swizzle_, pitch, dataSize, data):
+    if format_ in formats:
+        if depth != 1:
             raise NotImplementedError("Unsupported depth!")
-        if gfd.format == 0x00:
-            raise ValueError("Invalid texture format!")
+        if format_ == 0x00:
+            raise ValueError("Invalid texture format_!")
 
         else:
-            if gfd.format == 0x823:
-                format_ = 116
-            elif gfd.format == 0x1f:
-                format_ = 36
-            elif gfd.format == 0x820:
-                format_ = 113
-            elif (gfd.format == 0x1a or gfd.format == 0x41a):
-                format_ = 32
-            elif gfd.format == 0x19:
-                format_ = 31
-            elif gfd.format == 0x8:
-                format_ = 23
-            elif gfd.format == 0xa:
-                format_ = 25
-            elif gfd.format == 0xb:
-                format_ = 26
-            elif gfd.format == 0x1:
-                format_ = 50
-            elif gfd.format == 0x7:  # I'm not sure about this, but this is what Random Talking Bush said. :/
-                format_ = 51
-            elif (gfd.format == 0x31 or gfd.format == 0x431):
-                format_ = "BC1"
-            elif (gfd.format == 0x32 or gfd.format == 0x432):
-                format_ = "BC2"
-            elif (gfd.format == 0x33 or gfd.format == 0x433):
-                format_ = "BC3"
-            elif gfd.format == 0x34:
-                format_ = "BC4U"
-            elif gfd.format == 0x234:
-                format_ = "BC4S"
-            elif gfd.format == 0x35:
-                format_ = "BC5U"
-            elif gfd.format == 0x235:
-                format_ = "BC5S"
+            if format_ == 0x823:
+                format__ = 116
+            elif format_ == 0x1f:
+                format__ = 36
+            elif format_ == 0x820:
+                format__ = 113
+            elif (format_ == 0x1a or format_ == 0x41a):
+                format__ = 32
+            elif format_ == 0x19:
+                format__ = 31
+            elif format_ == 0x8:
+                format__ = 23
+            elif format_ == 0xa:
+                format__ = 25
+            elif format_ == 0xb:
+                format__ = 26
+            elif format_ == 0x1:
+                format__ = 50
+            elif format_ == 0x7:  # I'm not sure about this, but this is what Random Talking Bush said. :/
+                format__ = 51
+            elif format_ == 0x2:
+                format__ = 52
+            elif (format_ == 0x31 or format_ == 0x431):
+                format__ = "BC1"
+            elif (format_ == 0x32 or format_ == 0x432):
+                format__ = "BC2"
+            elif (format_ == 0x33 or format_ == 0x433):
+                format__ = "BC3"
+            elif format_ == 0x34:
+                format__ = "BC4U"
+            elif format_ == 0x234:
+                format__ = "BC4S"
+            elif format_ == 0x35:
+                format__ = "BC5U"
+            elif format_ == 0x235:
+                format__ = "BC5S"
 
-            if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x234 and gfd.format != 0x35 and gfd.format != 0x235):
-                result = swizzle(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+            if (format_ != 0x31 and format_ != 0x431 and format_ != 0x32 and format_ != 0x432 and format_ != 0x33 and format_ != 0x433 and format_ != 0x34 and format_ != 0x234 and format_ != 0x35 and format_ != 0x235):
+                result = swizzle(width, height, 0, format_, tileMode, swizzle_, pitch, data)
 
-                assert len(result) == gfd.dataSize
+                assert len(result) == dataSize
 
-                hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=False)
+                hdr = writeHeader(1, width, height, format__, compressed=False)
 
             else:
-                result = swizzle_BC(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, gfd.data)
+                result = swizzle_BC(width, height, 0, format_, tileMode, swizzle_, pitch, data)
 
-                assert len(result) == gfd.dataSize
+                assert len(result) == dataSize
 
-                hdr = writeHeader(1, gfd.width, gfd.height, format_, compressed=True)
+                hdr = writeHeader(1, width, height, format__, compressed=True)
 
     else:
         print("")
-        print("Unsupported texture format: " + hex(gfd.format))
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        print("Unsupported texture format_: " + hex(format_))
+        if i != (numImages - 1):
+            print("Continuing in 5 seconds...")
+            time.sleep(5)
+            hdr, result = b'', b''
+        else:
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
 
     return hdr, result
 
-def writeGFD(gfd, f, f1):
+def writeGFD(width, height, depth, format_, tileMode, swizzle_, pitch, dataSize, f, f1):
     # Well, let's credit RoadrunnerWMC anyway :P
-    if gfd.format in formats:
-        data = f1[0x80:0x80 + gfd.dataSize]
+    if format_ in formats:
+        if (format_ != 0x31 and format_ != 0x431 and format_ != 0x32 and format_ != 0x432 and format_ != 0x33 and format_ != 0x433 and format_ != 0x34 and format_ != 0x234 and format_ != 0x35 and format_ != 0x235):
+            bpp = struct.unpack("<I", f1[0x14:0x18])[0] // width
+            size = bpp * width * height
+        else:
+            size = struct.unpack("<I", f1[0x14:0x18])[0]
+
+        data = f1[0x80:0x80 + size]
 
     else:
         print("")
-        print("Unsupported texture format: " + hex(gfd.format))
+        print("Unsupported texture format_: " + hex(format_))
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
 
     swizzled_data = []
-    if (gfd.format != 0x31 and gfd.format != 0x431 and gfd.format != 0x32 and gfd.format != 0x432 and gfd.format != 0x33 and gfd.format != 0x433 and gfd.format != 0x34 and gfd.format != 0x234 and gfd.format != 0x35 and gfd.format != 0x235):
-        result = swizzle(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
+    if (format_ != 0x31 and format_ != 0x431 and format_ != 0x32 and format_ != 0x432 and format_ != 0x33 and format_ != 0x433 and format_ != 0x34 and format_ != 0x234 and format_ != 0x35 and format_ != 0x235):
+        result = swizzle(width, height, 0, format_, tileMode, swizzle_, pitch, data, True)
     else:
-        result = swizzle_BC(gfd.width, gfd.height, 0, gfd.format, gfd.tileMode, gfd.swizzle, gfd.pitch, data, True)
+        result = swizzle_BC(width, height, 0, format_, tileMode, swizzle_, pitch, data, True)
 
-    assert len(result) == gfd.dataSize
+    result = result[:size]
 
     swizzled_data.append(result)
 
@@ -309,6 +358,7 @@ def writeGFD(gfd, f, f1):
 
         elif block.type_ == 0x0C:
             head1 = f[:pos] # it works :P
+            offset1 = pos
             pos += block.dataSize
 
         else:
@@ -317,6 +367,8 @@ def writeGFD(gfd, f, f1):
     head1 = bytearray(head1)
     head1[offset + 0x10:offset + 0x14] = bytes(bytearray.fromhex("00000001"))
     head1[offset + 0x28:offset + 0x2C] = bytes(bytearray.fromhex("00000000"))
+    head1[offset + 0x20:offset + 0x24] = int(len(result)).to_bytes(4, 'big')
+    head1[offset1 - 0x0C:offset1 - 0x08] = int(len(result)).to_bytes(4, 'big')
     head2 = bytes(bytearray.fromhex("424C4B7B00000020000000010000000000000001000000000000000000000000"))
     return bytes(head1) + swizzled_data[0] + head2
 
@@ -921,6 +973,13 @@ def writeHeader(num_mipmaps, w, h, format_, compressed=False):
         gmask = 0x000000ff
         bmask = 0x000000ff
         amask = 0x0000ff00
+    elif format_ == 52:
+        fmtbpp = 1
+        has_alpha = 1
+        rmask = 0x0000000f
+        gmask = 0x0000000f
+        bmask = 0x0000000f
+        amask = 0x000000f0
 
     hdr[:4] = b'DDS '
     hdr[4:4+4] = 124 .to_bytes(4, 'little')
@@ -1008,7 +1067,7 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v3.3")
+    print("GTX Extractor v4.0")
     print("(C) 2014 Treeki, 2015-2016 AboodXD")
     
     if len(sys.argv) != 2:
@@ -1037,49 +1096,64 @@ def main():
                 img1 = img.read()
                 inf.close()
                 img.close()
-    
+
     data = readGFD(inb)
-
-    print("")
-    print("// ----- GX2Surface Info ----- ")
-    print("  dim       = " + str(data.dim))
-    print("  width     = " + str(data.width))
-    print("  height    = " + str(data.height))
-    print("  depth     = " + str(data.depth))
-    print("  numMips   = " + str(data.numMips))
-    if data.format in formats:
-        print("  format    = " + formats[data.format])
-    else:
-        print("  format    = " + hex(data.format))
-    print("  aa        = " + str(data.aa))
-    print("  use       = " + str(data.use))
-    print("  imageSize = " + str(data.imageSize))
-    print("  mipSize   = " + str(data.mipSize))
-    print("  tileMode  = " + str(data.tileMode))
-    print("  swizzle   = " + str(data.swizzle) + ", " + hex(data.swizzle))
-    print("  alignment = " + str(data.alignment))
-    print("  pitch     = " + str(data.pitch))
     
-    name = os.path.splitext(sys.argv[1])[0]
-
-    if sys.argv[1].endswith('.gtx'):
-        hdr, data = get_deswizzled_data(data)
-
-        output = open(name + '.dds', 'wb+')
-        output.write(hdr)
-        output.write(data)
-        output.close()
-        print('')
-        print('Finished converting: ' + sys.argv[1])
-
-    elif sys.argv[1].endswith('.dds'):
-        if os.path.isfile(name + ".gtx"):
-            output = open(name + "2.gtx", 'wb+')
+    for i in range(data.numImages):
+        data = readGFD(inb)
+        
+        print("")
+        print("// ----- GX2Surface Info ----- ")
+        print("  dim       = " + str(data.dim[i]))
+        print("  width     = " + str(data.width[i]))
+        print("  height    = " + str(data.height[i]))
+        print("  depth     = " + str(data.depth[i]))
+        print("  numMips   = " + str(data.numMips[i]))
+        if data.format[i] in formats:
+            print("  format    = " + formats[data.format[i]])
         else:
-            output = open(name + ".gtx", 'wb+')
-        output.write(writeGFD(data, inb, img1))
-        output.close()
-        print('')
-        print('Finished converting: ' + sys.argv[1])
+            print("  format    = " + hex(data.format[i]))
+        print("  aa        = " + str(data.aa[i]))
+        print("  use       = " + str(data.use[i]))
+        print("  imageSize = " + str(data.imageSize[i]))
+        print("  mipSize   = " + str(data.mipSize[i]))
+        print("  tileMode  = " + str(data.tileMode[i]))
+        print("  swizzle   = " + str(data.swizzle[i]) + ", " + hex(data.swizzle[i]))
+        print("  alignment = " + str(data.alignment[i]))
+        print("  pitch     = " + str(data.pitch[i]))
+        
+        name = os.path.splitext(sys.argv[1])[0]
+
+        if sys.argv[1].endswith('.gtx'):
+            if data.numImages > 1:
+                name += str(i)
+
+            hdr, data = get_deswizzled_data(i, data.numImages, data.width[i], data.height[i], data.depth[i], data.format[i], data.tileMode[i], data.swizzle[i], data.pitch[i], data.dataSize[i], data.data[i])
+
+            if data == b'':
+                pass
+            else:
+                output = open(name + '.dds', 'wb+')
+                output.write(hdr)
+                output.write(data)
+                output.close()
+
+        elif sys.argv[1].endswith('.dds'):
+            if data.numImages > 1:
+                print("")
+                print("Nope, you still can't do this... :P")
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
+            if os.path.isfile(name + ".gtx"):
+                output = open(name + "2.gtx", 'wb+')
+            else:
+                output = open(name + ".gtx", 'wb+')
+            output.write(writeGFD(data.width[i], data.height[i], data.depth[i], data.format[i], data.tileMode[i], data.swizzle[i], data.pitch[i], data.dataSize[i], inb, img1))
+            output.close()
+
+    print('')
+    print('Finished converting: ' + sys.argv[1])
 
 if __name__ == '__main__': main()

@@ -734,7 +734,7 @@ def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tile
     macroTileOffset = macroTileBytes * (macroTileIndexX + macroTilesPerRow * macroTileIndexY)
 
     if (tileMode == 8 or tileMode == 9 or tileMode == 10 or tileMode == 11 or tileMode == 14 or tileMode == 15):
-        bankSwapOrder = {0, 1, 3, 2, 6, 7, 5, 4, 0, 0}
+        bankSwapOrder = [0, 1, 3, 2, 6, 7, 5, 4, 0, 0]
         bankSwapWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch)
         swapIndex = macroTilePitch * macroTileIndexX // bankSwapWidth
         bank ^= bankSwapOrder[swapIndex & (m_banks - 1)]

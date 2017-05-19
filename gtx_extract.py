@@ -795,25 +795,25 @@ def writeHeader(num_mipmaps, w, h, format_, compressed):
     elif format_ == 85: # RGB565
         fmtbpp = 2
         has_alpha = 0
-        rmask = 0x0000f800
+        rmask = 0x0000001f
         gmask = 0x000007e0
-        bmask = 0x0000001f
+        bmask = 0x0000f800
         amask = 0x00000000
 
     elif format_ == 86: # RGB5A1
         fmtbpp = 2
         has_alpha = 1
-        rmask = 0x00007c00
+        rmask = 0x0000001f
         gmask = 0x000003e0
-        bmask = 0x0000001f
+        bmask = 0x00007c00
         amask = 0x00008000
 
     elif format_ == 115: # RGBA4
         fmtbpp = 2
         has_alpha = 1
-        rmask = 0x00000f00
+        rmask = 0x0000000f
         gmask = 0x000000f0
-        bmask = 0x0000000f
+        bmask = 0x00000f00
         amask = 0x0000f000
 
     elif format_ == 61: # L8
@@ -928,6 +928,27 @@ def main():
             print("Usage (If converting from .gtx to .dds, and using exe): gtx_extract.exe input")
             print("Usage (If converting from .dds to .gtx, and using source code): python gtx_extract.py input(.dds) input(.gtx)")
             print("Usage (If converting from .dds to .gtx, and using exe): gtx_extract.exe input(.dds) input(.gtx)")
+            print("")
+            print("Supported formats:")
+            print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_SRGB")
+            print(" - GX2_SURFACE_FORMAT_TCS_R10_G10_B10_A2_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TCS_R5_G6_B5_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TC_R5_G5_B5_A1_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TC_R4_G4_B4_A4_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TC_R8_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TC_R8_G8_UNORM")
+            print(" - GX2_SURFACE_FORMAT_TC_R4_G4_UNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC1_UNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC1_SRGB")
+            print(" - GX2_SURFACE_FORMAT_T_BC2_UNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC2_SRGB")
+            print(" - GX2_SURFACE_FORMAT_T_BC3_UNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC3_SRGB")
+            print(" - GX2_SURFACE_FORMAT_T_BC4_UNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC4_SNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC5_UNORM")
+            print(" - GX2_SURFACE_FORMAT_T_BC5_SNORM")
             print("")
             print("Exiting in 5 seconds...")
             time.sleep(5)

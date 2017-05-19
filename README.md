@@ -14,6 +14,4 @@ AboodXD - Writing this thingy.
 # Special thanks to:
 Treeki - This tool was based on his tool.  
 
-Exzap, AddrLib - Helping with swizzling.  
-
-RoadrunnerWMC - The writeGFD() function was based on a function in his program, PuzzleHD.
+Exzap, AddrLib - Helping with swizzling.

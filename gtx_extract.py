@@ -26,8 +26,7 @@ import os, struct, sys, time
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2017 AboodXD"
-__credits__ = ["AboodXD", "Treeki", "AddrLib",
-                    "Exzap", "RoadrunnerWMC"]
+__credits__ = ["AboodXD", "Treeki", "AddrLib", "Exzap"]
 
 formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x0000001a: 'GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM',
@@ -331,17 +330,38 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
 
 def writeGFD(width, height, depth, format_, tileMode, swizzle_, pitch, imageSize, f, f1):
     if format_ in formats:
-        if format_ not in BCn_formats:
-            bpp = struct.unpack("<I", f1[0x14:0x18])[0] // width
-            dataSize = bpp * width * height
-        else:
-            dataSize = struct.unpack("<I", f1[0x14:0x18])[0]
+        if depth != 1:
+            print("")
+            print("Unsupported depth!")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+        if aa != 0:
+            print("")
+            print("Unsupported aa!")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
 
-        if not dataSize < imageSize:
-            data = f1[0x80:0x80 + imageSize]
+        if format_ == 0x00:
+            print("")
+            print("Invalid texture format!")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+
         else:
-            data = f1[0x80:0x80 + dataSize]
-            data += b'\x00' * (imageSize-dataSize)
+            if format_ not in BCn_formats:
+                bpp = struct.unpack("<I", f1[0x14:0x18])[0] // width
+                dataSize = bpp * width * height
+            else:
+                dataSize = struct.unpack("<I", f1[0x14:0x18])[0]
+
+            if not dataSize < imageSize:
+                data = f1[0x80:0x80 + imageSize]
+            else:
+                data = f1[0x80:0x80 + dataSize]
+                data += b'\x00' * (imageSize-dataSize)
 
     else:
         print("")

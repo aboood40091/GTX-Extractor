@@ -328,7 +328,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
 
     return hdr, result
 
-def writeGFD(width, height, depth, format_, tileMode, swizzle_, pitch, imageSize, f, f1):
+def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, imageSize, f, f1):
     if format_ in formats:
         if depth != 1:
             print("")
@@ -496,83 +496,63 @@ def computeSurfaceThickness(tileMode):
 
     return thickness
 
-def computePixelIndexWithinMicroTile(x, y, bpp, tileMode, z=0, microTileType=0):
+def computePixelIndexWithinMicroTile(x, y, bpp, tileMode, z=0):
     pixelBit6 = 0
     pixelBit7 = 0
     pixelBit8 = 0
     thickness = computeSurfaceThickness(tileMode)
 
-    if microTileType == 3:
+    if bpp == 0x08:
+        pixelBit0 = x & 1
+        pixelBit1 = (x & 2) >> 1
+        pixelBit2 = (x & 4) >> 2
+        pixelBit3 = (y & 2) >> 1
+        pixelBit4 = y & 1
+        pixelBit5 = (y & 4) >> 2
+
+    elif bpp == 0x10:
+        pixelBit0 = x & 1
+        pixelBit1 = (x & 2) >> 1
+        pixelBit2 = (x & 4) >> 2
+        pixelBit3 = y & 1
+        pixelBit4 = (y & 2) >> 1
+        pixelBit5 = (y & 4) >> 2
+
+    elif (bpp == 0x20 or bpp == 0x60):
+        pixelBit0 = x & 1
+        pixelBit1 = (x & 2) >> 1
+        pixelBit2 = y & 1
+        pixelBit3 = (x & 4) >> 2
+        pixelBit4 = (y & 2) >> 1
+        pixelBit5 = (y & 4) >> 2
+
+    elif bpp == 0x40:
         pixelBit0 = x & 1
         pixelBit1 = y & 1
-        pixelBit2 = z & 1
-        pixelBit3 = (x & 2) >> 1
+        pixelBit2 = (x & 2) >> 1
+        pixelBit3 = (x & 4) >> 2
         pixelBit4 = (y & 2) >> 1
-        pixelBit5 = (z & 2) >> 1
-        pixelBit6 = (x & 4) >> 2
-        pixelBit7 = (y & 4) >> 2
+        pixelBit5 = (y & 4) >> 2
+
+    elif bpp == 0x80:
+        pixelBit0 = y & 1
+        pixelBit1 = x & 1
+        pixelBit2 = (x & 2) >> 1
+        pixelBit3 = (x & 4) >> 2
+        pixelBit4 = (y & 2) >> 1
+        pixelBit5 = (y & 4) >> 2
 
     else:
-        if microTileType != 0:
-            pixelBit0 = x & 1
-            pixelBit1 = y & 1
-            pixelBit2 = (x & 2) >> 1
-            pixelBit3 = (y & 2) >> 1
-            pixelBit4 = (x & 4) >> 2
-            pixelBit5 = (y & 4) >> 2
+        pixelBit0 = x & 1
+        pixelBit1 = (x & 2) >> 1
+        pixelBit2 = y & 1
+        pixelBit3 = (x & 4) >> 2
+        pixelBit4 = (y & 2) >> 1
+        pixelBit5 = (y & 4) >> 2
 
-        else:
-            if bpp == 0x08:
-                pixelBit0 = x & 1
-                pixelBit1 = (x & 2) >> 1
-                pixelBit2 = (x & 4) >> 2
-                pixelBit3 = (y & 2) >> 1
-                pixelBit4 = y & 1
-                pixelBit5 = (y & 4) >> 2
-
-            elif bpp == 0x10:
-                pixelBit0 = x & 1
-                pixelBit1 = (x & 2) >> 1
-                pixelBit2 = (x & 4) >> 2
-                pixelBit3 = y & 1
-                pixelBit4 = (y & 2) >> 1
-                pixelBit5 = (y & 4) >> 2
-
-            elif (bpp == 0x20 or bpp == 0x60):
-                pixelBit0 = x & 1
-                pixelBit1 = (x & 2) >> 1
-                pixelBit2 = y & 1
-                pixelBit3 = (x & 4) >> 2
-                pixelBit4 = (y & 2) >> 1
-                pixelBit5 = (y & 4) >> 2
-
-            elif bpp == 0x40:
-                pixelBit0 = x & 1
-                pixelBit1 = y & 1
-                pixelBit2 = (x & 2) >> 1
-                pixelBit3 = (x & 4) >> 2
-                pixelBit4 = (y & 2) >> 1
-                pixelBit5 = (y & 4) >> 2
-
-            elif bpp == 0x80:
-                pixelBit0 = y & 1
-                pixelBit1 = x & 1
-                pixelBit2 = (x & 2) >> 1
-                pixelBit3 = (x & 4) >> 2
-                pixelBit4 = (y & 2) >> 1
-                pixelBit5 = (y & 4) >> 2
-
-            else:
-                pixelBit0 = x & 1
-                pixelBit1 = (x & 2) >> 1
-                pixelBit2 = y & 1
-                pixelBit3 = (x & 4) >> 2
-                pixelBit4 = (y & 2) >> 1
-                pixelBit5 = (y & 4) >> 2
-
-        if thickness > 1:
-            pixelBit6 = z & 1
-            pixelBit7 = (z & 2) >> 1
+    if thickness > 1:
+        pixelBit6 = z & 1
+        pixelBit7 = (z & 2) >> 1
 
     if thickness == 8:
         pixelBit8 = (z & 4) >> 2
@@ -684,8 +664,6 @@ def computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples=1):
     return bankSwapWidth
 
 def AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch, height):
-    sliceSize = pitch * height
-
     rowOffset = y * pitch
     pixOffset = x
 
@@ -707,8 +685,6 @@ def AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, height, tile
 
     microTileOffset = microTileBytes * (microTileIndexX + microTileIndexY * microTilesPerRow)
 
-    sliceBytes = (pitch * height * microTileThickness * bpp + 7) // 8
-
     pixelIndex = computePixelIndexWithinMicroTile(x, y, bpp, tileMode)
 
     pixelOffset = bpp * pixelIndex
@@ -725,34 +701,20 @@ def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tile
     numBankBits = m_banksBitcount
 
     microTileThickness = computeSurfaceThickness(tileMode)
-    microTileBits = MicroTilePixels * microTileThickness * bpp
-    microTileBytes = microTileBits >> 3
 
     pixelIndex = computePixelIndexWithinMicroTile(x, y, bpp, tileMode)
 
-    elemOffset = bpp * pixelIndex
-
-    bytesPerSample = microTileBytes
-
-    elemOffset >>= 3
+    elemOffset = (bpp * pixelIndex) >> 3
 
     pipe = computePipeFromCoordWoRotation(x, y)
     bank = computeBankFromCoordWoRotation(x, y)
 
     bankPipe = pipe + numPipes * bank
     rotation = computeSurfaceRotationFromTileMode(tileMode)
-    swizzle = pipeSwizzle + numPipes * bankSwizzle
-    sliceIn = 0
 
-    if isThickMacroTiled(tileMode) != 0:
-        sliceIn >>= 2
-
-    bankPipe ^= 0
     bankPipe %= numPipes * numBanks
     pipe = bankPipe % numPipes
     bank = bankPipe // numPipes
-
-    sliceBytes = (pitch * height * microTileThickness * bpp + 7) // 8
 
     macroTilePitch = 8 * m_banks
     macroTileHeight = 8 * m_pipes
@@ -1035,7 +997,7 @@ def main():
                 time.sleep(5)
                 sys.exit(1)
 
-            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1)
+            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1)
 
             if os.path.isfile(name + ".gtx"):
                 #i = 2

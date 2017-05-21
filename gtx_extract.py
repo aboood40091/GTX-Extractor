@@ -905,7 +905,7 @@ def writeHeader(num_mipmaps, w, h, format_, compressed):
         hdr[84:84+4] = fourcc
 
         size = ((w + 3) >> 2) * ((h + 3) >> 2)
-        if (format_ == "BC1" or format_ == "BC4"):
+        if (format_ == "BC1" or format_ == "BC4U" or format_ == "BC4S"):
             size *= 8
         else:
             size *= 16

@@ -147,6 +147,7 @@ def readGFD(f):
     gfd.swizzle = []
     gfd.alignment = []
     gfd.pitch = []
+    gfd.realSize = []
 
     gfd.dataSize = []
     gfd.data = []
@@ -186,6 +187,10 @@ def readGFD(f):
             gfd.swizzle.append(surface.swizzle)
             gfd.alignment.append(surface.alignment)
             gfd.pitch.append(surface.pitch)
+            if surface.format_ in BCn_formats:
+                gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (surfaceGetBitsPerPixel(surface.format_) // 8))
+            else:
+                gfd.realSize.append(surface.width * surface.height * (surfaceGetBitsPerPixel(surface.format_) // 8))
 
         elif block.type_ == 0x0C:
             images += 1
@@ -234,7 +239,7 @@ def readGFD(f):
 
     return gfd
 
-def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, dataSize, data):
+def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, dataSize, data, size):
     if format_ in formats:
         if depth != 1:
             print("")
@@ -304,15 +309,9 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
                 format__ = "BC5S"
 
             result = swizzle(width, height, format_, tileMode, swizzle_, pitch, data)
+            result = result[:size]
 
-            if format_ in BCn_formats:
-                size = ((width + 3) >> 2) * ((height + 3) >> 2) * (surfaceGetBitsPerPixel(format_) // 8)
-                result = result[:size]
-            else:
-                size = width * height * (surfaceGetBitsPerPixel(format_) // 8)
-                result = result[:size]
-
-            hdr = writeHeader(1, width, height, format__, format_ in BCn_formats)
+            hdr = writeHeader(1, width, height, format__, size, format_ in BCn_formats)
 
     else:
         print("")
@@ -773,7 +772,7 @@ def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tile
 
 # Feel free to include this in your own program if you want, just give credits. :)
 
-def writeHeader(num_mipmaps, w, h, format_, compressed):
+def writeHeader(num_mipmaps, w, h, format_, size, compressed):
     hdr = bytearray(128)
 
     if format_ == 28: # RGBA8
@@ -840,19 +839,6 @@ def writeHeader(num_mipmaps, w, h, format_, compressed):
         bmask = 0x0000000f
         amask = 0x000000f0
 
-    hdr[:4] = b'DDS '
-    hdr[4:4+4] = 124 .to_bytes(4, 'little')
-    hdr[12:12+4] = h.to_bytes(4, 'little')
-    hdr[16:16+4] = w.to_bytes(4, 'little')
-    hdr[76:76+4] = 32 .to_bytes(4, 'little')
-
-    if not compressed:
-        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
-        hdr[92:92+4] = rmask.to_bytes(4, 'little')
-        hdr[96:96+4] = gmask.to_bytes(4, 'little')
-        hdr[100:100+4] = bmask.to_bytes(4, 'little')
-        hdr[104:104+4] = amask.to_bytes(4, 'little')
-
     flags = (0x00000001) | (0x00001000) | (0x00000004) | (0x00000002)
 
     caps = (0x00001000)
@@ -861,9 +847,6 @@ def writeHeader(num_mipmaps, w, h, format_, compressed):
     if num_mipmaps != 1:
         flags |= (0x00020000)
         caps |= ((0x00000008) | (0x00400000))
-
-    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
-    hdr[108:108+4] = caps.to_bytes(4, 'little')
 
     if not compressed:
         flags |= (0x00000008)
@@ -877,9 +860,7 @@ def writeHeader(num_mipmaps, w, h, format_, compressed):
         if has_alpha != 0:
             pflags |= (0x00000001)
 
-        hdr[8:8+4] = flags.to_bytes(4, 'little')
-        hdr[20:20+4] = (w * fmtbpp).to_bytes(4, 'little') # pitch
-        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+        size = w * fmtbpp
 
     else:
         flags |= (0x00080000)
@@ -896,21 +877,30 @@ def writeHeader(num_mipmaps, w, h, format_, compressed):
         elif format_ == "BC4S":
             fourcc = b'BC4S'
         elif format_ == "BC5U":
-            fourcc = b'ATI2'
+            fourcc = b'BC5U'
         elif format_ == "BC5S":
             fourcc = b'BC5S'
 
-        hdr[8:8+4] = flags.to_bytes(4, 'little')
-        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+    hdr[:4] = b'DDS '
+    hdr[4:4+4] = 124 .to_bytes(4, 'little')
+    hdr[8:8+4] = flags.to_bytes(4, 'little')
+    hdr[12:12+4] = h.to_bytes(4, 'little')
+    hdr[16:16+4] = w.to_bytes(4, 'little')
+    hdr[20:20+4] = size.to_bytes(4, 'little')
+    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
+    hdr[76:76+4] = 32 .to_bytes(4, 'little')
+    hdr[80:80+4] = pflags.to_bytes(4, 'little')
+
+    if compressed:
         hdr[84:84+4] = fourcc
+    else:
+        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
+        hdr[92:92+4] = rmask.to_bytes(4, 'little')
+        hdr[96:96+4] = gmask.to_bytes(4, 'little')
+        hdr[100:100+4] = bmask.to_bytes(4, 'little')
+        hdr[104:104+4] = amask.to_bytes(4, 'little')
 
-        size = ((w + 3) >> 2) * ((h + 3) >> 2)
-        if (format_ == "BC1" or format_ == "BC4U" or format_ == "BC4S"):
-            size *= 8
-        else:
-            size *= 16
-
-        hdr[20:20+4] = size.to_bytes(4, 'little') # linear size
+    hdr[108:108+4] = caps.to_bytes(4, 'little')
 
     return hdr
 
@@ -975,23 +965,28 @@ def main():
         
         print("")
         print("// ----- GX2Surface Info ----- ")
-        print("  dim       = " + str(gfd.dim[i]))
-        print("  width     = " + str(gfd.width[i]))
-        print("  height    = " + str(gfd.height[i]))
-        print("  depth     = " + str(gfd.depth[i]))
-        print("  numMips   = " + str(gfd.numMips[i]))
+        print("  dim             = " + str(gfd.dim[i]))
+        print("  width           = " + str(gfd.width[i]))
+        print("  height          = " + str(gfd.height[i]))
+        print("  depth           = " + str(gfd.depth[i]))
+        print("  numMips         = " + str(gfd.numMips[i]))
         if gfd.format[i] in formats:
-            print("  format    = " + formats[gfd.format[i]])
+            print("  format          = " + formats[gfd.format[i]])
         else:
-            print("  format    = " + hex(gfd.format[i]))
-        print("  aa        = " + str(gfd.aa[i]))
-        print("  use       = " + str(gfd.use[i]))
-        print("  imageSize = " + str(gfd.imageSize[i]))
-        print("  mipSize   = " + str(gfd.mipSize[i]))
-        print("  tileMode  = " + str(gfd.tileMode[i]))
-        print("  swizzle   = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
-        print("  alignment = " + str(gfd.alignment[i]))
-        print("  pitch     = " + str(gfd.pitch[i]))
+            print("  format          = " + hex(gfd.format[i]))
+        print("  aa              = " + str(gfd.aa[i]))
+        print("  use             = " + str(gfd.use[i]))
+        print("  imageSize       = " + str(gfd.imageSize[i]))
+        print("  mipSize         = " + str(gfd.mipSize[i]))
+        print("  tileMode        = " + str(gfd.tileMode[i]))
+        print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
+        print("  alignment       = " + str(gfd.alignment[i]))
+        print("  pitch           = " + str(gfd.pitch[i]))
+        bpp = surfaceGetBitsPerPixel(gfd.format[i])
+        print("")
+        print("  bits per pixel  = " + str(bpp))
+        print("  bytes per pixel = " + str(bpp // 8))
+        print("  realSize        = " + str(gfd.realSize[i]))
         
         name = os.path.splitext(sys.argv[1])[0]
 
@@ -999,7 +994,7 @@ def main():
             if gfd.numImages > 1:
                 name += str(i)
 
-            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.dataSize[i], gfd.data[i])
+            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.dataSize[i], gfd.data[i], gfd.realSize[i])
 
             if data == b'':
                 pass

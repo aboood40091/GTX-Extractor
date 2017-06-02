@@ -256,7 +256,7 @@ def readGFD(f):
 
     return gfd
 
-def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, dataSize, data, size, numMips, useMipmaps):
+def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, dataSize, data, size, numMips):
     if format_ in formats:
         if depth != 1:
             print("")
@@ -328,7 +328,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
             result = swizzle(width, height, format_, tileMode, swizzle_, pitch, data)
             result = result[:size]
 
-            if (numMips > 1) and (useMipmaps == 1):
+            if numMips > 1:
                mipCount = numMips
             else:
                mipCount = 1
@@ -449,7 +449,7 @@ def getGFDMipmapData(width, height, format_, tileMode, swizzle_, pitch, currentO
     swizzled_data = swizzle(width, height, format_, tileMode, swizzle_, pitch, data, True)
 
     return swizzled_data
-def writeGFD(gfd, f, name, useMipmaps):
+def writeGFD(gfd, f, name):
     
     pos = 0
     i = 0
@@ -477,6 +477,7 @@ def writeGFD(gfd, f, name, useMipmaps):
            surface.data(f, pos)
 
            with open(ddsName + '.dds', "rb") as img:
+               print('')
                print('Packing: ' + ddsName + '.dds')
                img1 = img.read()
                img.close()
@@ -494,10 +495,7 @@ def writeGFD(gfd, f, name, useMipmaps):
 
            outputBuffer = outputBuffer + bytearray(block.pack(block.magic, block.size_, block.majorVersion, block.minorVersion, block.type_, block.dataSize, block.id, block.typeIdx))
 
-           if useMipmaps == 0:
-              outputBuffer = outputBuffer + bytearray(surface.pack(surface.dim, surface.width, surface.height, surface.depth, 1, surface.format_, surface.aa, surface.use, dataSize, surface.imagePtr, 0, surface.mipPtr, surface.tileMode, surface.swizzle, surface.alignment, surface.pitch))
-           else:
-              outputBuffer = outputBuffer + bytearray(surface.pack(surface.dim, surface.width, surface.height, surface.depth, surface.numMips, surface.format_, surface.aa, surface.use, dataSize, surface.imagePtr, surface.mipSize, surface.mipPtr, surface.tileMode, surface.swizzle, surface.alignment, surface.pitch))
+           outputBuffer = outputBuffer + bytearray(surface.pack(surface.dim, surface.width, surface.height, surface.depth, surface.numMips, surface.format_, surface.aa, surface.use, dataSize, surface.imagePtr, surface.mipSize, surface.mipPtr, surface.tileMode, surface.swizzle, surface.alignment, surface.pitch))
 
            outputBuffer = outputBuffer + bytes(56) #Mipmap Offsets: 56
            
@@ -511,8 +509,7 @@ def writeGFD(gfd, f, name, useMipmaps):
            #Copy over old data
            outputBuffer[len(outputBuffer)-92:(len(outputBuffer) - 92) + 56] = f[pos + 64:pos + 64 + 56] #Mipmap Offsets: 56
            
-           if useMipmaps == 1:
-              outputBuffer[len(outputBuffer)-36:(len(outputBuffer) - 36) + 4] = f[pos + 120:pos + 120 + 4] #Num Mipmaps Again: 4
+           outputBuffer[len(outputBuffer)-36:(len(outputBuffer) - 36) + 4] = f[pos + 120:pos + 120 + 4] #Num Mipmaps Again: 4
 
            outputBuffer[len(outputBuffer)-20:len(outputBuffer)] = f[pos + 136:pos + 136 + 20] #Unknown3: 20
 
@@ -551,7 +548,7 @@ def writeGFD(gfd, f, name, useMipmaps):
             outputBuffer = outputBuffer + bytearray(block.pack(block.magic, block.size_, block.majorVersion, block.minorVersion, block.type_, dataSize, block.id, block.typeIdx))
             outputBuffer = outputBuffer + swizzled_data
 
-            if (surface.numMips > 1) and (useMipmaps == 1):
+            if surface.numMips > 1:
                currentPos = len(outputBuffer) + 32  
                paddingVal = currentPos % surface.alignment
 
@@ -583,52 +580,52 @@ def writeGFD(gfd, f, name, useMipmaps):
             pos += block.dataSize
 
         elif block.type_ == 0x0D:
-            
-            if useMipmaps == 1:
-               i += 1
-               print('Importing ' + str(surface.numMips - 1) + ' MipMaps')
 
-               #Add Mitmap Block
-               outputBuffer = outputBuffer + bytearray(block.pack(block.magic, block.size_, block.majorVersion, block.minorVersion, block.type_, block.dataSize, block.id, block.typeIdx))
+           i += 1
+           print('')
+           print('Importing ' + str(surface.numMips - 1) + ' MipMaps')
 
-               mipmapImgWidth = surface.width
-               mipmapImgHeight = surface.height
+           #Add Mitmap Block
+           outputBuffer = outputBuffer + bytearray(block.pack(block.magic, block.size_, block.majorVersion, block.minorVersion, block.type_, block.dataSize, block.id, block.typeIdx))
 
-               for index in range(surface.numMips - 1):
-                  mipmapImgWidth = int(mipmapImgWidth / 2)
-                  mipmapImgHeight = int(mipmapImgHeight / 2)
+           mipmapImgWidth = surface.width
+           mipmapImgHeight = surface.height
 
-                  if mipmapImgWidth < 1:
-                     mipmapImgWidth = 1
+           for index in range(surface.numMips - 1):
+              mipmapImgWidth = int(mipmapImgWidth / 2)
+              mipmapImgHeight = int(mipmapImgHeight / 2)
 
-                  if mipmapImgHeight < 1:
-                     mipmapImgHeight = 1
-                   
-                  mipPitch = 2**(surface.numMips - 1 - index)
+              if mipmapImgWidth < 1:
+                 mipmapImgWidth = 1
 
-                  print(str(index + 1) + ": " + str(mipmapImgWidth) + "x" + str(mipmapImgHeight))
+              if mipmapImgHeight < 1:
+                 mipmapImgHeight = 1
+               
+              mipPitch = int(surface.pitch / int(surface.width / mipmapImgWidth))
 
-                  if index == 0: #First
-                     mipOffset = 0
-                     mipDataSize = int.from_bytes(mipmapOffsets[4:8], byteorder='big', signed=False)
-                  elif index == surface.numMips - 2: #Last
-                     mipOffset = int.from_bytes(mipmapOffsets[index * 4:(index * 4) + 4], byteorder='big', signed=False)
-                     mipDataSize = block.dataSize - mipOffset
-                  else:
-                     mipOffset = int.from_bytes(mipmapOffsets[index * 4:(index * 4) + 4], byteorder='big', signed=False)
-                     mipDataSize = int.from_bytes(mipmapOffsets[(index + 1) * 4:((index + 1) * 4) + 4], byteorder='big', signed=False) - mipOffset
+              print(str(index + 1) + ": " + str(mipmapImgWidth) + "x" + str(mipmapImgHeight))
 
-                  if surface.format_ in BCn_formats:
-                     mipRealSize = ((mipmapImgWidth + 3) >> 2) * ((mipmapImgHeight + 3) >> 2) * (surfaceGetBitsPerPixel(surface.format_) // 8)
-                  else:
-                     mipRealSize = mipmapImgWidth * mipmapImgHeight * (surfaceGetBitsPerPixel(surface.format_) // 8)
+              if index == 0: #First
+                 mipOffset = 0
+                 mipDataSize = int.from_bytes(mipmapOffsets[4:8], byteorder='big', signed=False)
+              elif index == surface.numMips - 2: #Last
+                 mipOffset = int.from_bytes(mipmapOffsets[index * 4:(index * 4) + 4], byteorder='big', signed=False)
+                 mipDataSize = block.dataSize - mipOffset
+              else:
+                 mipOffset = int.from_bytes(mipmapOffsets[index * 4:(index * 4) + 4], byteorder='big', signed=False)
+                 mipDataSize = int.from_bytes(mipmapOffsets[(index + 1) * 4:((index + 1) * 4) + 4], byteorder='big', signed=False) - mipOffset
 
-                  swizzled_data = getGFDMipmapData(mipmapImgWidth, mipmapImgHeight, surface.format_, surface.tileMode, surface.swizzle, mipPitch, currentDDSOffset, mipDataSize, mipRealSize, img1)      
-                  outputBuffer = outputBuffer + swizzled_data
+              if surface.format_ in BCn_formats:
+                 mipRealSize = ((mipmapImgWidth + 3) >> 2) * ((mipmapImgHeight + 3) >> 2) * (surfaceGetBitsPerPixel(surface.format_) // 8)
+              else:
+                 mipRealSize = mipmapImgWidth * mipmapImgHeight * (surfaceGetBitsPerPixel(surface.format_) // 8)
 
-                  currentDDSOffset += mipRealSize
+              swizzled_data = getGFDMipmapData(mipmapImgWidth, mipmapImgHeight, surface.format_, surface.tileMode, surface.swizzle, mipPitch, currentDDSOffset, mipDataSize, mipRealSize, img1)      
+              outputBuffer = outputBuffer + swizzled_data
 
-            pos += block.dataSize
+              currentDDSOffset += mipRealSize
+
+           pos += block.dataSize
 
         else:
             pos += block.dataSize
@@ -1175,64 +1172,55 @@ def main():
        sys.exit(1)
 
     mipIndex = 0
-    useMips = 0
     
     if sys.argv[1].endswith('.gtx'):
         with open(sys.argv[1], "rb") as inf:
             print('Converting: ' + sys.argv[1])
             inb = inf.read()
             inf.close()
-        if (len(sys.argv) == 3):
-           if sys.argv[2].startswith('-mips'):
-              useMips = 1
-              print('Exporting MipMaps...')
     elif sys.argv[1].endswith('.dds'):
         with open(sys.argv[2], "rb") as inf:          
             print('Converting: ' + sys.argv[1])
             inb = inf.read()         
             inf.close()
-        if (len(sys.argv) == 4):
-           if sys.argv[3].startswith('-mips'):
-              useMips = 1
-              print('Importing MipMaps...')
                 
     gfd = readGFD(inb)
     
     for i in range(gfd.numImages):
+
+        print("")
+        print("// ----- GX2Surface Info ----- ")
+        print("  dim             = " + str(gfd.dim[i]))
+        print("  width           = " + str(gfd.width[i]))
+        print("  height          = " + str(gfd.height[i]))
+        print("  depth           = " + str(gfd.depth[i]))
+        print("  numMips         = " + str(gfd.numMips[i]))
+        if gfd.format[i] in formats:
+            print("  format          = " + formats[gfd.format[i]])
+        else:
+            print("  format          = " + hex(gfd.format[i]))
+        print("  aa              = " + str(gfd.aa[i]))
+        print("  use             = " + str(gfd.use[i]))
+        print("  imageSize       = " + str(gfd.imageSize[i]))
+        print("  mipSize         = " + str(gfd.mipSize[i]))
+        print("  tileMode        = " + str(gfd.tileMode[i]))
+        print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
+        print("  alignment       = " + str(gfd.alignment[i]))
+        print("  pitch           = " + str(gfd.pitch[i]))
+        bpp = surfaceGetBitsPerPixel(gfd.format[i])
+        print("")
+        print("  bits per pixel  = " + str(bpp))
+        print("  bytes per pixel = " + str(bpp // 8))
+        print("  realSize        = " + str(gfd.realSize[i]))
         
         if sys.argv[1].endswith('.gtx'):
-          
-            print("")
-            print("// ----- GX2Surface Info ----- ")
-            print("  dim             = " + str(gfd.dim[i]))
-            print("  width           = " + str(gfd.width[i]))
-            print("  height          = " + str(gfd.height[i]))
-            print("  depth           = " + str(gfd.depth[i]))
-            print("  numMips         = " + str(gfd.numMips[i]))
-            if gfd.format[i] in formats:
-                print("  format          = " + formats[gfd.format[i]])
-            else:
-                print("  format          = " + hex(gfd.format[i]))
-            print("  aa              = " + str(gfd.aa[i]))
-            print("  use             = " + str(gfd.use[i]))
-            print("  imageSize       = " + str(gfd.imageSize[i]))
-            print("  mipSize         = " + str(gfd.mipSize[i]))
-            print("  tileMode        = " + str(gfd.tileMode[i]))
-            print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
-            print("  alignment       = " + str(gfd.alignment[i]))
-            print("  pitch           = " + str(gfd.pitch[i]))
-            bpp = surfaceGetBitsPerPixel(gfd.format[i])
-            print("")
-            print("  bits per pixel  = " + str(bpp))
-            print("  bytes per pixel = " + str(bpp // 8))
-            print("  realSize        = " + str(gfd.realSize[i]))
 
             name = os.path.splitext(sys.argv[1])[0]
 
             if gfd.numImages > 1:
                 name += str(i)
 
-            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.dataSize[i], gfd.data[i], gfd.realSize[i], gfd.numMips[i], useMips)
+            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.dataSize[i], gfd.data[i], gfd.realSize[i], gfd.numMips[i])
 
             if data == b'':
                 pass
@@ -1241,7 +1229,7 @@ def main():
                 output.write(hdr)
                 output.write(data)
 
-                if (gfd.numMips[i] > 1) and (useMips == 1):
+                if gfd.numMips[i] > 1:
             
                    mipmapData = gfd.mipmapData[mipIndex]
                    mipmapTotalSize = gfd.mipmapSize[mipIndex]
@@ -1265,7 +1253,7 @@ def main():
                       if mipmapImgHeight < 1:
                          mipmapImgHeight = 1
                    
-                      mipPitch = 2**(gfd.numMips[i] - 1 - index)
+                      mipPitch = int(gfd.pitch[i] / int(gfd.width[i] / mipmapImgWidth))
 
                       print(str(index + 1) + ": " + str(mipmapImgWidth) + "x" + str(mipmapImgHeight))
 
@@ -1294,7 +1282,7 @@ def main():
 
             name = os.path.splitext(sys.argv[2])[0]
             
-            data = writeGFD(gfd, inb, name, useMips)
+            data = writeGFD(gfd, inb, name)
 
             if os.path.isfile(name + ".gtx"):
                 output = open(name + "2.gtx", 'wb+')

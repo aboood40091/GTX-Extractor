@@ -1138,13 +1138,12 @@ def main():
     print("GTX Extractor v4.1")
     print("(C) 2014 Treeki, 2015-2017 AboodXD")
     
-    if (len(sys.argv) < 2) or (len(sys.argv) > 4):
+    if (len(sys.argv) < 2) or (len(sys.argv) > 3):
        print("")
        print("Usage (If converting from .gtx to .dds, and using source code): python gtx_extract.py input")
        print("Usage (If converting from .gtx to .dds, and using exe): gtx_extract.exe input")
        print("Usage (If converting from .dds to .gtx, and using source code): python gtx_extract.py input(.dds) input(.gtx)")
        print("Usage (If converting from .dds to .gtx, and using exe): gtx_extract.exe input(.dds) input(.gtx)")
-       print("Use -mips to export/import the MipMaps depending on the mode")
        print("")
        print("Supported formats:")
        print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM")
@@ -1187,33 +1186,33 @@ def main():
     gfd = readGFD(inb)
     
     for i in range(gfd.numImages):
-
-        print("")
-        print("// ----- GX2Surface Info ----- ")
-        print("  dim             = " + str(gfd.dim[i]))
-        print("  width           = " + str(gfd.width[i]))
-        print("  height          = " + str(gfd.height[i]))
-        print("  depth           = " + str(gfd.depth[i]))
-        print("  numMips         = " + str(gfd.numMips[i]))
-        if gfd.format[i] in formats:
-            print("  format          = " + formats[gfd.format[i]])
-        else:
-            print("  format          = " + hex(gfd.format[i]))
-        print("  aa              = " + str(gfd.aa[i]))
-        print("  use             = " + str(gfd.use[i]))
-        print("  imageSize       = " + str(gfd.imageSize[i]))
-        print("  mipSize         = " + str(gfd.mipSize[i]))
-        print("  tileMode        = " + str(gfd.tileMode[i]))
-        print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
-        print("  alignment       = " + str(gfd.alignment[i]))
-        print("  pitch           = " + str(gfd.pitch[i]))
-        bpp = surfaceGetBitsPerPixel(gfd.format[i])
-        print("")
-        print("  bits per pixel  = " + str(bpp))
-        print("  bytes per pixel = " + str(bpp // 8))
-        print("  realSize        = " + str(gfd.realSize[i]))
         
         if sys.argv[1].endswith('.gtx'):
+                      
+            print("")
+            print("// ----- GX2Surface Info ----- ")
+            print("  dim             = " + str(gfd.dim[i]))
+            print("  width           = " + str(gfd.width[i]))
+            print("  height          = " + str(gfd.height[i]))
+            print("  depth           = " + str(gfd.depth[i]))
+            print("  numMips         = " + str(gfd.numMips[i]))
+            if gfd.format[i] in formats:
+                print("  format          = " + formats[gfd.format[i]])
+            else:
+                print("  format          = " + hex(gfd.format[i]))
+            print("  aa              = " + str(gfd.aa[i]))
+            print("  use             = " + str(gfd.use[i]))
+            print("  imageSize       = " + str(gfd.imageSize[i]))
+            print("  mipSize         = " + str(gfd.mipSize[i]))
+            print("  tileMode        = " + str(gfd.tileMode[i]))
+            print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
+            print("  alignment       = " + str(gfd.alignment[i]))
+            print("  pitch           = " + str(gfd.pitch[i]))
+            bpp = surfaceGetBitsPerPixel(gfd.format[i])
+            print("")
+            print("  bits per pixel  = " + str(bpp))
+            print("  bytes per pixel = " + str(bpp // 8))
+            print("  realSize        = " + str(gfd.realSize[i]))
 
             name = os.path.splitext(sys.argv[1])[0]
 

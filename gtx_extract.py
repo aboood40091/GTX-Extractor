@@ -22,7 +22,16 @@
 
 """gtx_extract.py: Decode GTX images."""
 
-import os, struct, sys, time
+import os
+import platform
+import struct
+import sys
+import time
+
+if platform.system() == "Windows":
+    import swizzling_cy as swizzling
+else:
+    import swizzling
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2017 AboodXD"
@@ -52,12 +61,11 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
 
 BCn_formats = [0x31, 0x431, 0x32, 0x432, 0x33, 0x433, 0x34, 0x234, 0x35, 0x235]
 
+
 # ----------\/-Start of GTX Extracting section-\/------------- #
-class GFDData():
-    width, height = 0, 0
-    format = 0
-    dataSize = 0
-    data = b''
+class GFDData:
+    pass
+
 
 class GFDHeader(struct.Struct):
     def __init__(self):
@@ -65,13 +73,14 @@ class GFDHeader(struct.Struct):
 
     def data(self, data, pos):
         (self.magic,
-        self.size_,
-        self.majorVersion,
-        self.minorVersion,
-        self.gpuVersion,
-        self.alignMode,
-        self.reserved1,
-        self.reserved2) = self.unpack_from(data, pos)
+         self.size_,
+         self.majorVersion,
+         self.minorVersion,
+         self.gpuVersion,
+         self.alignMode,
+         self.reserved1,
+         self.reserved2) = self.unpack_from(data, pos)
+
 
 class GFDBlockHeader(struct.Struct):
     def __init__(self):
@@ -79,13 +88,14 @@ class GFDBlockHeader(struct.Struct):
 
     def data(self, data, pos):
         (self.magic,
-        self.size_,
-        self.majorVersion,
-        self.minorVersion,
-        self.type_,
-        self.dataSize,
-        self.id,
-        self.typeIdx) = self.unpack_from(data, pos)
+         self.size_,
+         self.majorVersion,
+         self.minorVersion,
+         self.type_,
+         self.dataSize,
+         self.id,
+         self.typeIdx) = self.unpack_from(data, pos)
+
 
 class GFDSurface(struct.Struct):
     def __init__(self):
@@ -93,24 +103,26 @@ class GFDSurface(struct.Struct):
 
     def data(self, data, pos):
         (self.dim,
-        self.width,
-        self.height,
-        self.depth,
-        self.numMips,
-        self.format_,
-        self.aa,
-        self.use,
-        self.imageSize,
-        self.imagePtr,
-        self.mipSize,
-        self.mipPtr,
-        self.tileMode,
-        self.swizzle,
-        self.alignment,
-        self.pitch) = self.unpack_from(data, pos)
+         self.width,
+         self.height,
+         self.depth,
+         self.numMips,
+         self.format_,
+         self.aa,
+         self.use,
+         self.imageSize,
+         self.imagePtr,
+         self.mipSize,
+         self.mipPtr,
+         self.tileMode,
+         self.swizzle,
+         self.alignment,
+         self.pitch) = self.unpack_from(data, pos)
+
 
 def swapRB(bgra):
     return bytes((bgra[2], bgra[1], bgra[0], bgra[3]))
+
 
 def readGFD(f):
     gfd = GFDData()
@@ -119,7 +131,7 @@ def readGFD(f):
 
     header = GFDHeader()
     header.data(f, pos)
-    
+
     if header.magic != b'Gfx2':
         raise ValueError("Invalid file header!")
 
@@ -152,7 +164,7 @@ def readGFD(f):
     gfd.dataSize = []
     gfd.data = []
 
-    while pos < len(f): # Loop through the entire file, stop if reached the end of the file.
+    while pos < len(f):  # Loop through the entire file, stop if reached the end of the file.
         block = GFDBlockHeader()
         block.data(f, pos)
 
@@ -188,9 +200,11 @@ def readGFD(f):
             gfd.alignment.append(surface.alignment)
             gfd.pitch.append(surface.pitch)
             if surface.format_ in BCn_formats:
-                gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (surfaceGetBitsPerPixel(surface.format_) // 8))
+                gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (
+                    swizzling.surfaceGetBitsPerPixel(surface.format_) // 8))
             else:
-                gfd.realSize.append(surface.width * surface.height * (surfaceGetBitsPerPixel(surface.format_) // 8))
+                gfd.realSize.append(
+                    surface.width * surface.height * (swizzling.surfaceGetBitsPerPixel(surface.format_) // 8))
 
         elif block.type_ == 0x0C:
             images += 1
@@ -239,7 +253,8 @@ def readGFD(f):
 
     return gfd
 
-def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, dataSize, data, size):
+
+def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, data, size):
     if format_ in formats:
         if depth != 1:
             print("")
@@ -277,7 +292,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
                 sys.exit(1)
 
         else:
-            if (format_ == 0x1a or format_ == 0x41a):
+            if format_ == 0x1a or format_ == 0x41a:
                 format__ = 28
             elif format_ == 0x19:
                 format__ = 24
@@ -293,11 +308,11 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
                 format__ = 49
             elif format_ == 0x2:
                 format__ = 112
-            elif (format_ == 0x31 or format_ == 0x431):
+            elif format_ == 0x31 or format_ == 0x431:
                 format__ = "BC1"
-            elif (format_ == 0x32 or format_ == 0x432):
+            elif format_ == 0x32 or format_ == 0x432:
                 format__ = "BC2"
-            elif (format_ == 0x33 or format_ == 0x433):
+            elif format_ == 0x33 or format_ == 0x433:
                 format__ = "BC3"
             elif format_ == 0x34:
                 format__ = "BC4U"
@@ -308,7 +323,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
             elif format_ == 0x235:
                 format__ = "BC5S"
 
-            result = swizzle(width, height, format_, tileMode, swizzle_, pitch, data)
+            result = swizzling.deswizzle(width, height, format_, tileMode, swizzle_, pitch, data)
             result = result[:size]
 
             hdr = writeHeader(1, width, height, format__, size, format_ in BCn_formats)
@@ -326,6 +341,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
             sys.exit(1)
 
     return hdr, result
+
 
 def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, imageSize, f, f1):
     if format_ in formats:
@@ -360,7 +376,7 @@ def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, image
                 data = f1[0x80:0x80 + imageSize]
             else:
                 data = f1[0x80:0x80 + dataSize]
-                data += b'\x00' * (imageSize-dataSize)
+                data += b'\x00' * (imageSize - dataSize)
 
     else:
         print("")
@@ -369,7 +385,7 @@ def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, image
         time.sleep(5)
         sys.exit(1)
 
-    swizzled_data = swizzle(width, height, format_, tileMode, swizzle_, pitch, data, True)
+    swizzled_data = swizzling.swizzle(width, height, format_, tileMode, swizzle_, pitch, data)
 
     dataSize = len(swizzled_data)
 
@@ -378,7 +394,7 @@ def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, image
     header.data(f, pos)
     pos += header.size
 
-    while pos < len(f): # Loop through the entire file.
+    while pos < len(f):  # Loop through the entire file.
         block = GFDBlockHeader()
         block.data(f, pos)
 
@@ -390,7 +406,7 @@ def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, image
             pos += block.dataSize
 
         elif block.type_ == 0x0C:
-            head1 = f[:pos] # it works :P
+            head1 = f[:pos]  # it works :P
             offset1 = pos
             pos += block.dataSize
 
@@ -398,356 +414,16 @@ def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, image
             pos += block.dataSize
 
     head1 = bytearray(head1)
-    head1[offset + 0x10:offset + 0x14] = bytes(bytearray.fromhex("00000001")) # numMips
-    head1[offset + 0x78:offset + 0x7C] = bytes(bytearray.fromhex("00000001")) # numMips, again
-    head1[offset + 0x28:offset + 0x2C] = bytes(bytearray.fromhex("00000000")) # mipSize
-    head1[offset + 0x20:offset + 0x24] = int(dataSize).to_bytes(4, 'big') # imageSize
-    head1[offset1 - 0x0C:offset1 - 0x08] = int(dataSize).to_bytes(4, 'big') # dataSize
+    head1[offset + 0x10:offset + 0x14] = bytes(bytearray.fromhex("00000001"))  # numMips
+    head1[offset + 0x78:offset + 0x7C] = bytes(bytearray.fromhex("00000001"))  # numMips, again
+    head1[offset + 0x28:offset + 0x2C] = bytes(bytearray.fromhex("00000000"))  # mipSize
+    head1[offset + 0x20:offset + 0x24] = int(dataSize).to_bytes(4, 'big')  # imageSize
+    head1[offset1 - 0x0C:offset1 - 0x08] = int(dataSize).to_bytes(4, 'big')  # dataSize
 
     head2 = bytes(bytearray.fromhex("424C4B7B00000020000000010000000000000001000000000000000000000000"))
 
-    return bytes(head1) + swizzled_data + head2
+    return bytes(head1) + bytes(swizzled_data) + head2
 
-# ----------\/-Start of the swizzling section-\/---------- #
-def swizzle(width, height, format_, tileMode, swizzle, pitch, data, toGFD=False):
-    result = bytearray(data)
-
-    if format_ in BCn_formats:
-        width //= 4
-        height //= 4
-
-    for y in range(height):
-        for x in range(width):
-            bpp = surfaceGetBitsPerPixel(format_)
-            pipeSwizzle = (swizzle >> 8) & 1
-            bankSwizzle = (swizzle >> 9) & 3
-
-            if (tileMode == 0 or tileMode == 1):
-                pos = AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch, height)
-            elif (tileMode == 2 or tileMode == 3):
-                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, height, tileMode)
-            else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tileMode, pipeSwizzle, bankSwizzle)
-
-            bpp //= 8
-
-            pos_ = (y * width + x) * bpp
-
-            if toGFD:
-                if (pos < len(data)) and (pos_ < len(data)):
-                    result[pos:pos + bpp] = data[pos_:pos_ + bpp]
-            else:
-                if (pos_ < len(data)) and (pos < len(data)):
-                    result[pos_:pos_ + bpp] = data[pos:pos + bpp]
-
-    return result
-
-# Credits:
-#  -AddrLib: actual code
-#  -Exzap: modifying code to apply to Wii U textures
-#  -AboodXD: porting, code improvements and cleaning up
-
-m_banks = 4
-m_banksBitcount = 2
-m_pipes = 2
-m_pipesBitcount = 1
-m_pipeInterleaveBytes = 256
-m_pipeInterleaveBytesBitcount = 8
-m_rowSize = 2048
-m_swapSize = 256
-m_splitSize = 2048
-
-m_chipFamily = 2
-
-MicroTilePixels = 8 * 8
-
-formatHwInfo = b"\x00\x00\x00\x01\x08\x03\x00\x01\x08\x01\x00\x01\x00\x00\x00\x01" \
-    b"\x00\x00\x00\x01\x10\x07\x00\x00\x10\x03\x00\x01\x10\x03\x00\x01" \
-    b"\x10\x0B\x00\x01\x10\x01\x00\x01\x10\x03\x00\x01\x10\x03\x00\x01" \
-    b"\x10\x03\x00\x01\x20\x03\x00\x00\x20\x07\x00\x00\x20\x03\x00\x00" \
-    b"\x20\x03\x00\x01\x20\x05\x00\x00\x00\x00\x00\x00\x20\x03\x00\x00" \
-    b"\x00\x00\x00\x00\x00\x00\x00\x01\x20\x03\x00\x01\x00\x00\x00\x01" \
-    b"\x00\x00\x00\x01\x20\x0B\x00\x01\x20\x0B\x00\x01\x20\x0B\x00\x01" \
-    b"\x40\x05\x00\x00\x40\x03\x00\x00\x40\x03\x00\x00\x40\x03\x00\x00" \
-    b"\x40\x03\x00\x01\x00\x00\x00\x00\x80\x03\x00\x00\x80\x03\x00\x00" \
-    b"\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x10\x01\x00\x00" \
-    b"\x10\x01\x00\x00\x20\x01\x00\x00\x20\x01\x00\x00\x20\x01\x00\x00" \
-    b"\x00\x01\x00\x01\x00\x01\x00\x00\x00\x01\x00\x00\x60\x01\x00\x00" \
-    b"\x60\x01\x00\x00\x40\x01\x00\x01\x80\x01\x00\x01\x80\x01\x00\x01" \
-    b"\x40\x01\x00\x01\x80\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00" \
-    b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" \
-    b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-
-def surfaceGetBitsPerPixel(surfaceFormat):
-    hwFormat = surfaceFormat & 0x3F
-    bpp = formatHwInfo[hwFormat * 4 + 0]
-
-    return bpp
-
-def computeSurfaceThickness(tileMode):
-    thickness = 1
-
-    if (tileMode == 3 or tileMode == 7 or tileMode == 11 or tileMode == 13 or tileMode == 15):
-        thickness = 4
-
-    elif (tileMode == 16 or tileMode == 17):
-        thickness = 8
-
-    return thickness
-
-def computePixelIndexWithinMicroTile(x, y, bpp, tileMode, z=0):
-    pixelBit6 = 0
-    pixelBit7 = 0
-    pixelBit8 = 0
-    thickness = computeSurfaceThickness(tileMode)
-
-    if bpp == 0x08:
-        pixelBit0 = x & 1
-        pixelBit1 = (x & 2) >> 1
-        pixelBit2 = (x & 4) >> 2
-        pixelBit3 = (y & 2) >> 1
-        pixelBit4 = y & 1
-        pixelBit5 = (y & 4) >> 2
-
-    elif bpp == 0x10:
-        pixelBit0 = x & 1
-        pixelBit1 = (x & 2) >> 1
-        pixelBit2 = (x & 4) >> 2
-        pixelBit3 = y & 1
-        pixelBit4 = (y & 2) >> 1
-        pixelBit5 = (y & 4) >> 2
-
-    elif (bpp == 0x20 or bpp == 0x60):
-        pixelBit0 = x & 1
-        pixelBit1 = (x & 2) >> 1
-        pixelBit2 = y & 1
-        pixelBit3 = (x & 4) >> 2
-        pixelBit4 = (y & 2) >> 1
-        pixelBit5 = (y & 4) >> 2
-
-    elif bpp == 0x40:
-        pixelBit0 = x & 1
-        pixelBit1 = y & 1
-        pixelBit2 = (x & 2) >> 1
-        pixelBit3 = (x & 4) >> 2
-        pixelBit4 = (y & 2) >> 1
-        pixelBit5 = (y & 4) >> 2
-
-    elif bpp == 0x80:
-        pixelBit0 = y & 1
-        pixelBit1 = x & 1
-        pixelBit2 = (x & 2) >> 1
-        pixelBit3 = (x & 4) >> 2
-        pixelBit4 = (y & 2) >> 1
-        pixelBit5 = (y & 4) >> 2
-
-    else:
-        pixelBit0 = x & 1
-        pixelBit1 = (x & 2) >> 1
-        pixelBit2 = y & 1
-        pixelBit3 = (x & 4) >> 2
-        pixelBit4 = (y & 2) >> 1
-        pixelBit5 = (y & 4) >> 2
-
-    if thickness > 1:
-        pixelBit6 = z & 1
-        pixelBit7 = (z & 2) >> 1
-
-    if thickness == 8:
-        pixelBit8 = (z & 4) >> 2
-
-    return ((pixelBit8 << 8) | (pixelBit7 << 7) | (pixelBit6 << 6) |
-            32 * pixelBit5 | 16 * pixelBit4 | 8 * pixelBit3 |
-            4 * pixelBit2 | pixelBit0 | 2 * pixelBit1)
-
-def computePipeFromCoordWoRotation(x, y):
-    # hardcoded to assume 2 pipes
-    return ((y >> 3) ^ (x >> 3)) & 1
-
-def computeBankFromCoordWoRotation(x, y):
-    numPipes = m_pipes
-    numBanks = m_banks
-    bank = 0
-
-    if numBanks == 4:
-        bankBit0 = ((y // (16 * numPipes)) ^ (x >> 3)) & 1
-        bank = bankBit0 | 2 * (((y // (8 * numPipes)) ^ (x >> 4)) & 1)
-
-    elif numBanks == 8:
-        bankBit0a = ((y // (32 * numPipes)) ^ (x >> 3)) & 1
-        bank = bankBit0a | 2 * (((y // (32 * numPipes)) ^ (y // (16 * numPipes) ^ (x >> 4))) & 1) | 4 * (((y // (8 * numPipes)) ^ (x >> 5)) & 1)
-
-    return bank
-
-def computeSurfaceRotationFromTileMode(tileMode):
-    pipes = m_pipes
-    result = 0
-
-    if (tileMode == 4 or tileMode == 5 or tileMode == 6 or tileMode == 7 or tileMode == 8 or tileMode == 9 or tileMode == 10 or tileMode == 11):
-        result = pipes * ((m_banks >> 1) - 1)
-
-    elif (tileMode == 12 or tileMode == 13 or tileMode == 14 or tileMode == 15):
-        if not pipes < 4:
-            result = (pipes >> 1) - 1
-
-        else:
-            result = 1
-
-    return result
-
-def isThickMacroTiled(tileMode):
-    thickMacroTiled = 0
-
-    if (tileMode == 7 or tileMode == 11 or tileMode == 13 or tileMode == 15):
-        thickMacroTiled = 1
-
-    return thickMacroTiled
-
-def isBankSwappedTileMode(tileMode):
-    bankSwapped = 0
-
-    if (tileMode == 8 or tileMode == 9 or tileMode == 10 or tileMode == 11 or tileMode == 14 or tileMode == 15):
-        bankSwapped = 1
-
-    return bankSwapped
-
-def computeMacroTileAspectRatio(tileMode):
-    ratio = 1
-
-    if (tileMode == 8 or tileMode == 12 or tileMode == 14):
-        ratio = 1
-
-    elif (tileMode == 5 or tileMode == 9):
-        ratio = 2
-
-    elif (tileMode == 6 or tileMode == 10):
-        ratio = 4
-
-    return ratio
-
-def computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples=1):
-    if isBankSwappedTileMode(tileMode) == 0: return 0
-
-    numBanks = m_banks
-    numPipes = m_pipes
-    swapSize = m_swapSize
-    rowSize = m_rowSize
-    splitSize = m_splitSize
-    groupSize = m_pipeInterleaveBytes
-    bytesPerSample = 8 * bpp
-
-    try:
-        samplesPerTile = splitSize // bytesPerSample
-        slicesPerTile = max(1, numSamples // samplesPerTile)
-    except ZeroDivisionError:
-        slicesPerTile = 1
-
-    if isThickMacroTiled(tileMode) != 0:
-        numSamples = 4
-
-    bytesPerTileSlice = numSamples * bytesPerSample // slicesPerTile
-
-    factor = computeMacroTileAspectRatio(tileMode)
-    swapTiles = max(1, (swapSize >> 1) // bpp)
-
-    swapWidth = swapTiles * 8 * numBanks;
-    heightBytes = numSamples * factor * numPipes * bpp // slicesPerTile
-    swapMax = numPipes * numBanks * rowSize // heightBytes
-    swapMin = groupSize * 8 * numBanks // bytesPerTileSlice
-
-    bankSwapWidth = min(swapMax, max(swapMin, swapWidth))
-
-    while not bankSwapWidth < (2 * pitch):
-        bankSwapWidth >>= 1
-
-    return bankSwapWidth
-
-def AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch, height):
-    rowOffset = y * pitch
-    pixOffset = x
-
-    addr = (rowOffset + pixOffset) * bpp
-    addr //= 8
-
-    return addr
-
-def AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, height, tileMode):
-    microTileThickness = 1
-
-    if tileMode == 3:
-        microTileThickness = 4
-
-    microTileBytes = (MicroTilePixels * microTileThickness * bpp + 7) // 8
-    microTilesPerRow = pitch >> 3
-    microTileIndexX = x >> 3
-    microTileIndexY = y >> 3
-
-    microTileOffset = microTileBytes * (microTileIndexX + microTileIndexY * microTilesPerRow)
-
-    pixelIndex = computePixelIndexWithinMicroTile(x, y, bpp, tileMode)
-
-    pixelOffset = bpp * pixelIndex
-
-    pixelOffset >>= 3
-
-    return pixelOffset + microTileOffset
-
-def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tileMode, pipeSwizzle, bankSwizzle):
-    numPipes = m_pipes
-    numBanks = m_banks
-    numGroupBits = m_pipeInterleaveBytesBitcount
-    numPipeBits = m_pipesBitcount
-    numBankBits = m_banksBitcount
-
-    microTileThickness = computeSurfaceThickness(tileMode)
-
-    pixelIndex = computePixelIndexWithinMicroTile(x, y, bpp, tileMode)
-
-    elemOffset = (bpp * pixelIndex) >> 3
-
-    pipe = computePipeFromCoordWoRotation(x, y)
-    bank = computeBankFromCoordWoRotation(x, y)
-
-    bankPipe = pipe + numPipes * bank
-    rotation = computeSurfaceRotationFromTileMode(tileMode)
-
-    bankPipe %= numPipes * numBanks
-    pipe = bankPipe % numPipes
-    bank = bankPipe // numPipes
-
-    macroTilePitch = 8 * m_banks
-    macroTileHeight = 8 * m_pipes
-
-    if (tileMode == 5 or tileMode == 9): # GX2_TILE_MODE_2D_TILED_THIN4 and GX2_TILE_MODE_2B_TILED_THIN2
-        macroTilePitch >>= 1
-        macroTileHeight *= 2
-
-    elif (tileMode == 6 or tileMode == 10): # GX2_TILE_MODE_2D_TILED_THIN4 and GX2_TILE_MODE_2B_TILED_THIN4
-        macroTilePitch >>= 2
-        macroTileHeight *= 4
-
-    macroTilesPerRow = pitch // macroTilePitch
-    macroTileBytes = (microTileThickness * bpp * macroTileHeight * macroTilePitch + 7) // 8
-    macroTileIndexX = x // macroTilePitch
-    macroTileIndexY = y // macroTileHeight
-    macroTileOffset = macroTileBytes * (macroTileIndexX + macroTilesPerRow * macroTileIndexY)
-
-    if (tileMode == 8 or tileMode == 9 or tileMode == 10 or tileMode == 11 or tileMode == 14 or tileMode == 15):
-        bankSwapOrder = [0, 1, 3, 2, 6, 7, 5, 4, 0, 0]
-        bankSwapWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch)
-        swapIndex = macroTilePitch * macroTileIndexX // bankSwapWidth
-        bank ^= bankSwapOrder[swapIndex & (m_banks - 1)]
-
-    group_mask = (1 << numGroupBits) - 1
-    total_offset = elemOffset + (macroTileOffset >> (numBankBits + numPipeBits))
-
-    offset_high = (total_offset & ~(group_mask)) << (numBankBits + numPipeBits)
-    offset_low = total_offset & group_mask
-    bank_bits = bank << (numPipeBits + numGroupBits)
-    pipe_bits = pipe << numGroupBits
-    pos = bank_bits | pipe_bits | offset_low | offset_high
- 
-    return pos
 
 # ----------\/-Start of DDS writer section-\/---------- #
 
@@ -775,7 +451,7 @@ def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tile
 def writeHeader(num_mipmaps, w, h, format_, size, compressed):
     hdr = bytearray(128)
 
-    if format_ == 28: # RGBA8
+    if format_ == 28:  # RGBA8
         fmtbpp = 4
         has_alpha = 1
         rmask = 0x000000ff
@@ -783,7 +459,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x00ff0000
         amask = 0xff000000
 
-    elif format_ == 24: # RGB10A2
+    elif format_ == 24:  # RGB10A2
         fmtbpp = 4
         has_alpha = 1
         rmask = 0x000003ff
@@ -791,7 +467,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x3ff00000
         amask = 0xc0000000
 
-    elif format_ == 85: # RGB565
+    elif format_ == 85:  # RGB565
         fmtbpp = 2
         has_alpha = 0
         rmask = 0x0000001f
@@ -799,7 +475,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x0000f800
         amask = 0x00000000
 
-    elif format_ == 86: # RGB5A1
+    elif format_ == 86:  # RGB5A1
         fmtbpp = 2
         has_alpha = 1
         rmask = 0x0000001f
@@ -807,7 +483,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x00007c00
         amask = 0x00008000
 
-    elif format_ == 115: # RGBA4
+    elif format_ == 115:  # RGBA4
         fmtbpp = 2
         has_alpha = 1
         rmask = 0x0000000f
@@ -815,7 +491,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x00000f00
         amask = 0x0000f000
 
-    elif format_ == 61: # L8
+    elif format_ == 61:  # L8
         fmtbpp = 1
         has_alpha = 0
         rmask = 0x000000ff
@@ -823,7 +499,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x000000ff
         amask = 0x00000000
 
-    elif format_ == 49: # L8A8
+    elif format_ == 49:  # L8A8
         fmtbpp = 2
         has_alpha = 1
         rmask = 0x000000ff
@@ -831,7 +507,7 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x000000ff
         amask = 0x0000ff00
 
-    elif format_ == 112: # L4A4
+    elif format_ == 112:  # L4A4
         fmtbpp = 1
         has_alpha = 1
         rmask = 0x0000000f
@@ -839,32 +515,33 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         bmask = 0x0000000f
         amask = 0x000000f0
 
-    flags = (0x00000001) | (0x00001000) | (0x00000004) | (0x00000002)
+    flags = 0x00000001 | 0x00001000 | 0x00000004 | 0x00000002
 
-    caps = (0x00001000)
+    caps = 0x00001000
 
-    if num_mipmaps == 0: num_mipmaps = 1
-    if num_mipmaps != 1:
-        flags |= (0x00020000)
-        caps |= ((0x00000008) | (0x00400000))
+    if num_mipmaps == 0:
+        num_mipmaps = 1
+    elif num_mipmaps != 1:
+        flags |= 0x00020000
+        caps |= 0x00000008 | 0x00400000
 
     if not compressed:
-        flags |= (0x00000008)
+        flags |= 0x00000008
 
-        if (fmtbpp == 1 or format_ == 49): # LUMINANCE
-            pflags = (0x00020000)
+        if fmtbpp == 1 or format_ == 49:  # LUMINANCE
+            pflags = 0x00020000
 
-        else: # RGB
-            pflags = (0x00000040)
+        else:  # RGB
+            pflags = 0x00000040
 
         if has_alpha != 0:
-            pflags |= (0x00000001)
+            pflags |= 0x00000001
 
         size = w * fmtbpp
 
     else:
-        flags |= (0x00080000)
-        pflags = (0x00000004)
+        flags |= 0x00080000
+        pflags = 0x00000004
 
         if format_ == "BC1":
             fourcc = b'DXT1'
@@ -882,27 +559,28 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
             fourcc = b'BC5S'
 
     hdr[:4] = b'DDS '
-    hdr[4:4+4] = 124 .to_bytes(4, 'little')
-    hdr[8:8+4] = flags.to_bytes(4, 'little')
-    hdr[12:12+4] = h.to_bytes(4, 'little')
-    hdr[16:16+4] = w.to_bytes(4, 'little')
-    hdr[20:20+4] = size.to_bytes(4, 'little')
-    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
-    hdr[76:76+4] = 32 .to_bytes(4, 'little')
-    hdr[80:80+4] = pflags.to_bytes(4, 'little')
+    hdr[4:4 + 4] = 124 .to_bytes(4, 'little')
+    hdr[8:8 + 4] = flags.to_bytes(4, 'little')
+    hdr[12:12 + 4] = h.to_bytes(4, 'little')
+    hdr[16:16 + 4] = w.to_bytes(4, 'little')
+    hdr[20:20 + 4] = size.to_bytes(4, 'little')
+    hdr[28:28 + 4] = num_mipmaps.to_bytes(4, 'little')
+    hdr[76:76 + 4] = 32 .to_bytes(4, 'little')
+    hdr[80:80 + 4] = pflags.to_bytes(4, 'little')
 
     if compressed:
-        hdr[84:84+4] = fourcc
+        hdr[84:84 + 4] = fourcc
     else:
-        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
-        hdr[92:92+4] = rmask.to_bytes(4, 'little')
-        hdr[96:96+4] = gmask.to_bytes(4, 'little')
-        hdr[100:100+4] = bmask.to_bytes(4, 'little')
-        hdr[104:104+4] = amask.to_bytes(4, 'little')
+        hdr[88:88 + 4] = (fmtbpp << 3).to_bytes(4, 'little')
+        hdr[92:92 + 4] = rmask.to_bytes(4, 'little')
+        hdr[96:96 + 4] = gmask.to_bytes(4, 'little')
+        hdr[100:100 + 4] = bmask.to_bytes(4, 'little')
+        hdr[104:104 + 4] = amask.to_bytes(4, 'little')
 
-    hdr[108:108+4] = caps.to_bytes(4, 'little')
+    hdr[108:108 + 4] = caps.to_bytes(4, 'little')
 
     return hdr
+
 
 def main():
     """
@@ -910,13 +588,14 @@ def main():
     """
     print("GTX Extractor v4.1")
     print("(C) 2014 Treeki, 2015-2017 AboodXD")
-    
+
     if len(sys.argv) != 2:
         if len(sys.argv) != 3:
             print("")
             print("Usage (If converting from .gtx to .dds, and using source code): python gtx_extract.py input")
             print("Usage (If converting from .gtx to .dds, and using exe): gtx_extract.exe input")
-            print("Usage (If converting from .dds to .gtx, and using source code): python gtx_extract.py input(.dds) input(.gtx)")
+            print(
+                "Usage (If converting from .dds to .gtx, and using source code): python gtx_extract.py input(.dds) input(.gtx)")
             print("Usage (If converting from .dds to .gtx, and using exe): gtx_extract.exe input(.dds) input(.gtx)")
             print("")
             print("Supported formats:")
@@ -943,7 +622,7 @@ def main():
             print("Exiting in 5 seconds...")
             time.sleep(5)
             sys.exit(1)
-    
+
     if sys.argv[1].endswith('.gtx'):
         with open(sys.argv[1], "rb") as inf:
             print('Converting: ' + sys.argv[1])
@@ -960,9 +639,9 @@ def main():
                 img.close()
 
     gfd = readGFD(inb)
-    
+
     for i in range(gfd.numImages):
-        
+
         print("")
         print("// ----- GX2Surface Info ----- ")
         print("  dim             = " + str(gfd.dim[i]))
@@ -982,19 +661,21 @@ def main():
         print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
         print("  alignment       = " + str(gfd.alignment[i]))
         print("  pitch           = " + str(gfd.pitch[i]))
-        bpp = surfaceGetBitsPerPixel(gfd.format[i])
+        bpp = swizzling.surfaceGetBitsPerPixel(gfd.format[i])
         print("")
         print("  bits per pixel  = " + str(bpp))
         print("  bytes per pixel = " + str(bpp // 8))
         print("  realSize        = " + str(gfd.realSize[i]))
-        
+
         name = os.path.splitext(sys.argv[1])[0]
 
         if sys.argv[1].endswith('.gtx'):
             if gfd.numImages > 1:
                 name += str(i)
 
-            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.dataSize[i], gfd.data[i], gfd.realSize[i])
+            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i],
+                                            gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.data[i],
+                                            gfd.realSize[i])
 
             if data == b'':
                 pass
@@ -1013,13 +694,14 @@ def main():
                 time.sleep(5)
                 sys.exit(1)
 
-            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1)
+            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i],
+                            gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1)
 
             if os.path.isfile(name + ".gtx"):
-                #i = 2
-                #while os.path.isfile(name + str(i) + ".gtx"):
+                # i = 2
+                # while os.path.isfile(name + str(i) + ".gtx"):
                 #    i += 1
-                #output = open(name + str(i) + ".gtx", 'wb+')
+                # output = open(name + str(i) + ".gtx", 'wb+')
                 output = open(name + "2.gtx", 'wb+')
             else:
                 output = open(name + ".gtx", 'wb+')
@@ -1030,4 +712,6 @@ def main():
     print('')
     print('Finished converting: ' + sys.argv[1])
 
-if __name__ == '__main__': main()
+
+if __name__ == '__main__':
+    main()

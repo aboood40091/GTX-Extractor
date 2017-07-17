@@ -1,0 +1,8 @@
+
+__pycache__/
+.idea/
+build/
+dist/
+build.bat
+build_swizzling_cy.bat
+*.spec

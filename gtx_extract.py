@@ -28,6 +28,8 @@ import struct
 import sys
 import time
 
+import cal_param
+
 if platform.system() == "Windows":
     import swizzling_cy as swizzling
 else:
@@ -159,6 +161,7 @@ def readGFD(f):
     gfd.swizzle = []
     gfd.alignment = []
     gfd.pitch = []
+    gfd.surfOut = []
     gfd.realSize = []
 
     gfd.dataSize = []
@@ -183,6 +186,8 @@ def readGFD(f):
             pos += surface.size
             pos += (23 * 4)
 
+            surfOut = cal_param._GX2GetSurfaceInfo(surface.format_, surface.width, surface.height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
+
             gfd.dim.append(surface.dim)
             gfd.width.append(surface.width)
             gfd.height.append(surface.height)
@@ -198,7 +203,8 @@ def readGFD(f):
             gfd.tileMode.append(surface.tileMode)
             gfd.swizzle.append(surface.swizzle)
             gfd.alignment.append(surface.alignment)
-            gfd.pitch.append(surface.pitch)
+            gfd.pitch.append(surfOut.pitch)
+            gfd.surfOut.append(surfOut)
             if surface.format_ in BCn_formats:
                 gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (
                     swizzling.surfaceGetBitsPerPixel(surface.format_) // 8))
@@ -254,19 +260,8 @@ def readGFD(f):
     return gfd
 
 
-def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMode, swizzle_, pitch, data, size):
+def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, data, size, surfOut):
     if format_ in formats:
-        if depth != 1:
-            print("")
-            print("Unsupported depth!")
-            if i != (numImages - 1):
-                print("Continuing in 5 seconds...")
-                time.sleep(5)
-                return b'', b''
-            else:
-                print("Exiting in 5 seconds...")
-                time.sleep(5)
-                sys.exit(1)
         if aa != 0:
             print("")
             print("Unsupported aa!")
@@ -323,7 +318,19 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
             elif format_ == 0x235:
                 format__ = "BC5S"
 
-            result = swizzling.deswizzle(width, height, format_, tileMode, swizzle_, pitch, data)
+            if surfOut.depth != 1:
+                print("")
+                print("Unsupported depth!")
+                if i != (numImages - 1):
+                    print("Continuing in 5 seconds...")
+                    time.sleep(5)
+                    return b'', b''
+                else:
+                    print("Exiting in 5 seconds...")
+                    time.sleep(5)
+                    sys.exit(1)
+
+            result = swizzling.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
             result = result[:size]
 
             hdr = writeHeader(1, width, height, format__, size, format_ in BCn_formats)
@@ -343,14 +350,8 @@ def get_deswizzled_data(i, numImages, width, height, depth, format_, aa, tileMod
     return hdr, result
 
 
-def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, imageSize, f, f1):
+def writeGFD(width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, imageSize, f, f1, surfOut):
     if format_ in formats:
-        if depth != 1:
-            print("")
-            print("Unsupported depth!")
-            print("Exiting in 5 seconds...")
-            time.sleep(5)
-            sys.exit(1)
         if aa != 0:
             print("")
             print("Unsupported aa!")
@@ -385,7 +386,14 @@ def writeGFD(width, height, depth, format_, aa, tileMode, swizzle_, pitch, image
         time.sleep(5)
         sys.exit(1)
 
-    swizzled_data = swizzling.swizzle(width, height, format_, tileMode, swizzle_, pitch, data)
+    if surfOut.depth != 1:
+            print("")
+            print("Unsupported depth!")
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+
+    swizzled_data = swizzling.swizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
 
     dataSize = len(swizzled_data)
 
@@ -673,9 +681,9 @@ def main():
             if gfd.numImages > 1:
                 name += str(i)
 
-            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i],
-                                            gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.data[i],
-                                            gfd.realSize[i])
+            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.dim[i],
+                                            gfd.format[i],gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i],
+                                            gfd.data[i], gfd.realSize[i], gfd.surfOut[i])
 
             if data == b'':
                 pass
@@ -694,8 +702,8 @@ def main():
                 time.sleep(5)
                 sys.exit(1)
 
-            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.format[i], gfd.aa[i], gfd.tileMode[i],
-                            gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1)
+            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.dim[i], gfd.format[i], gfd.aa[i],
+                            gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1, gfd.surfOut[i])
 
             if os.path.isfile(name + ".gtx"):
                 # i = 2

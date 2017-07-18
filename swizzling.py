@@ -1,18 +1,27 @@
 # Use Python 3.4+
+import math
 
 BCn_formats = [0x31, 0x431, 0x32, 0x432, 0x33, 0x433, 0x34, 0x234, 0x35, 0x235]
 
 
-def deswizzle(width, height, format_, tileMode, swizzle_, pitch, data):
+def deswizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, data):
     result = bytearray(data)
 
     if format_ in BCn_formats:
-        width //= 4
-        height //= 4
+        width /= 4
+        width_float = math.modf(width)
+        width = int(width_float[1])
+        if width_float[0] >= 0.5:
+            width += 1
+
+        height /= 4
+        height_float = math.modf(height)
+        height = int(height_float[1])
+        if height_float[0] >= 0.5:
+            height += 1
 
     for y in range(height):
         for x in range(width):
-            bpp = surfaceGetBitsPerPixel(format_)
             pipeSwizzle = (swizzle_ >> 8) & 1
             bankSwizzle = (swizzle_ >> 9) & 3
 
@@ -21,29 +30,37 @@ def deswizzle(width, height, format_, tileMode, swizzle_, pitch, data):
             elif tileMode == 2 or tileMode == 3:
                 pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tileMode,
+                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height2, tileMode,
                                                                               pipeSwizzle, bankSwizzle)
+            bpp2 = bpp
+            bpp2 //= 8
 
-            bpp //= 8
-
-            pos_ = (y * width + x) * bpp
+            pos_ = (y * width + x) * bpp2
 
             if (pos_ < len(data)) and (pos < len(data)):
-                result[pos_:pos_ + bpp] = data[pos:pos + bpp]
+                result[pos_:pos_ + bpp2] = data[pos:pos + bpp2]
 
     return result
 
 
-def swizzle(width, height, format_, tileMode, swizzle_, pitch, data):
+def swizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, data):
     result = bytearray(data)
 
     if format_ in BCn_formats:
-        width //= 4
-        height //= 4
+        width /= 4
+        width_float = math.modf(width)
+        width = int(width_float[1])
+        if width_float[0] >= 0.5:
+            width += 1
+
+        height /= 4
+        height_float = math.modf(height)
+        height = int(height_float[1])
+        if height_float[0] >= 0.5:
+            height += 1
 
     for y in range(height):
         for x in range(width):
-            bpp = surfaceGetBitsPerPixel(format_)
             pipeSwizzle = (swizzle_ >> 8) & 1
             bankSwizzle = (swizzle_ >> 9) & 3
 
@@ -52,15 +69,16 @@ def swizzle(width, height, format_, tileMode, swizzle_, pitch, data):
             elif tileMode == 2 or tileMode == 3:
                 pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tileMode,
+                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height2, tileMode,
                                                                               pipeSwizzle, bankSwizzle)
 
-            bpp //= 8
+            bpp2 = bpp
+            bpp2 //= 8
 
-            pos_ = (y * width + x) * bpp
+            pos_ = (y * width + x) * bpp2
 
             if (pos < len(data)) and (pos_ < len(data)):
-                result[pos:pos + bpp] = data[pos_:pos_ + bpp]
+                result[pos:pos + bpp2] = data[pos_:pos_ + bpp2]
 
     return result
 

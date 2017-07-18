@@ -1,5 +1,4 @@
 # Use Python 3.4+
-import math
 
 BCn_formats = [0x31, 0x431, 0x32, 0x432, 0x33, 0x433, 0x34, 0x234, 0x35, 0x235]
 
@@ -8,17 +7,8 @@ def deswizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, d
     result = bytearray(data)
 
     if format_ in BCn_formats:
-        width /= 4
-        width_float = math.modf(width)
-        width = int(width_float[1])
-        if width_float[0] >= 0.5:
-            width += 1
-
-        height /= 4
-        height_float = math.modf(height)
-        height = int(height_float[1])
-        if height_float[0] >= 0.5:
-            height += 1
+        width = (width + 3) // 4
+        height = (height + 3) // 4
 
     for y in range(height):
         for x in range(width):
@@ -47,17 +37,8 @@ def swizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, dat
     result = bytearray(data)
 
     if format_ in BCn_formats:
-        width /= 4
-        width_float = math.modf(width)
-        width = int(width_float[1])
-        if width_float[0] >= 0.5:
-            width += 1
-
-        height /= 4
-        height_float = math.modf(height)
-        height = int(height_float[1])
-        if height_float[0] >= 0.5:
-            height += 1
+        width = (width + 3) // 4
+        height = (height + 3) // 4
 
     for y in range(height):
         for x in range(width):

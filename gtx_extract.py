@@ -186,7 +186,14 @@ def readGFD(f):
             pos += surface.size
             pos += (23 * 4)
 
-            surfOut = cal_param._GX2GetSurfaceInfo(surface.format_, surface.width, surface.height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
+            if surface.format_ in BCn_formats:
+                width = surface.width // 4
+                height = surface.height // 4
+            else:
+                width = surface.width
+                height = surface.height
+
+            surfOut = cal_param._GX2GetSurfaceInfo(surface.format_, width, height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
 
             gfd.dim.append(surface.dim)
             gfd.width.append(surface.width)

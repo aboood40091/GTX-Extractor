@@ -99,7 +99,7 @@ class GFDBlockHeader(struct.Struct):
          self.typeIdx) = self.unpack_from(data, pos)
 
 
-class GFDSurface(struct.Struct):
+class GX2Surface(struct.Struct):
     def __init__(self):
         super().__init__('>16I')
 
@@ -161,6 +161,7 @@ def readGFD(f):
     gfd.swizzle = []
     gfd.alignment = []
     gfd.pitch = []
+    gfd.compSel = []
     gfd.surfOut = []
     gfd.realSize = []
 
@@ -180,11 +181,17 @@ def readGFD(f):
             imgInfo += 1
             blockB = True
 
-            surface = GFDSurface()
+            surface = GX2Surface()
             surface.data(f, pos)
 
             pos += surface.size
-            pos += (23 * 4)
+            pos += 68
+
+            compSel = []
+            for i in range(4):
+                compSel.append(f[pos + i])
+
+            pos += 24
 
             if surface.format_ in BCn_formats:
                 width = surface.width // 4
@@ -211,6 +218,7 @@ def readGFD(f):
             gfd.swizzle.append(surface.swizzle)
             gfd.alignment.append(surface.alignment)
             gfd.pitch.append(surfOut.pitch)
+            gfd.compSel.append(compSel)
             gfd.surfOut.append(surfOut)
             if surface.format_ in BCn_formats:
                 gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (
@@ -267,7 +275,7 @@ def readGFD(f):
     return gfd
 
 
-def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, data, size, surfOut):
+def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, compSel, data, size, surfOut):
     if format_ in formats:
         if aa != 0:
             print("")
@@ -340,7 +348,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
             result = swizzling.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
             result = result[:size]
 
-            hdr = writeHeader(1, width, height, format__, size, format_ in BCn_formats)
+            hdr = writeHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)
 
     else:
         print("")
@@ -463,7 +471,7 @@ def writeGFD(width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, 
 
 # Feel free to include this in your own program if you want, just give credits. :)
 
-def writeHeader(num_mipmaps, w, h, format_, size, compressed):
+def writeHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     hdr = bytearray(128)
 
     if format_ == 28:  # RGBA8
@@ -587,10 +595,42 @@ def writeHeader(num_mipmaps, w, h, format_, size, compressed):
         hdr[84:84 + 4] = fourcc
     else:
         hdr[88:88 + 4] = (fmtbpp << 3).to_bytes(4, 'little')
-        hdr[92:92 + 4] = rmask.to_bytes(4, 'little')
-        hdr[96:96 + 4] = gmask.to_bytes(4, 'little')
-        hdr[100:100 + 4] = bmask.to_bytes(4, 'little')
-        hdr[104:104 + 4] = amask.to_bytes(4, 'little')
+
+        if compSel[0] == 1:
+            hdr[92:92 + 4] = gmask.to_bytes(4, 'little')
+        elif compSel[0] == 2:
+            hdr[92:92 + 4] = bmask.to_bytes(4, 'little')
+        elif compSel[0] == 3:
+            hdr[92:92 + 4] = amask.to_bytes(4, 'little')
+        else:
+            hdr[92:92 + 4] = rmask.to_bytes(4, 'little')
+
+        if compSel[1] == 0:
+            hdr[96:96 + 4] = rmask.to_bytes(4, 'little')
+        elif compSel[1] == 2:
+            hdr[96:96 + 4] = bmask.to_bytes(4, 'little')
+        elif compSel[1] == 3:
+            hdr[96:96 + 4] = amask.to_bytes(4, 'little')
+        else:
+            hdr[96:96 + 4] = gmask.to_bytes(4, 'little')
+
+        if compSel[2] == 0:
+            hdr[100:100 + 4] = rmask.to_bytes(4, 'little')
+        elif compSel[2] == 1:
+            hdr[100:100 + 4] = gmask.to_bytes(4, 'little')
+        elif compSel[2] == 3:
+            hdr[100:100 + 4] = amask.to_bytes(4, 'little')
+        else:
+            hdr[100:100 + 4] = bmask.to_bytes(4, 'little')
+
+        if compSel[3] == 0:
+            hdr[104:104 + 4] = rmask.to_bytes(4, 'little')
+        elif compSel[3] == 1:
+            hdr[104:104 + 4] = gmask.to_bytes(4, 'little')
+        elif compSel[3] == 2:
+            hdr[104:104 + 4] = bmask.to_bytes(4, 'little')
+        else:
+            hdr[104:104 + 4] = amask.to_bytes(4, 'little')
 
     hdr[108:108 + 4] = caps.to_bytes(4, 'little')
 
@@ -653,6 +693,8 @@ def main():
                 inf.close()
                 img.close()
 
+    compSel = ["Red", "Green", "Blue", "Alpha", "0", "1"]
+
     gfd = readGFD(inb)
 
     for i in range(gfd.numImages):
@@ -678,6 +720,12 @@ def main():
         print("  pitch           = " + str(gfd.pitch[i]))
         bpp = swizzling.surfaceGetBitsPerPixel(gfd.format[i])
         print("")
+        print("  GX2 Component Selector:")
+        print("    Channel 1:      " + str(compSel[gfd.compSel[i][0]]))
+        print("    Channel 2:      " + str(compSel[gfd.compSel[i][1]]))
+        print("    Channel 3:      " + str(compSel[gfd.compSel[i][2]]))
+        print("    Channel 4:      " + str(compSel[gfd.compSel[i][3]]))
+        print("")
         print("  bits per pixel  = " + str(bpp))
         print("  bytes per pixel = " + str(bpp // 8))
         print("  realSize        = " + str(gfd.realSize[i]))
@@ -690,7 +738,7 @@ def main():
 
             hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.dim[i],
                                             gfd.format[i],gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i],
-                                            gfd.data[i], gfd.realSize[i], gfd.surfOut[i])
+                                            gfd.compSel[i], gfd.data[i], gfd.realSize[i], gfd.surfOut[i])
 
             if data == b'':
                 pass

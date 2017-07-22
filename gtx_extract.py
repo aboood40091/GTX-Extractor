@@ -23,14 +23,13 @@
 """gtx_extract.py: Decode GTX images."""
 
 import os
-import platform
 import struct
 import sys
 import time
 
-if platform.system() == "Windows":
+try:
     import addrlib_cy as addrlib
-else:
+except ImportError:
     import addrlib
 
 __author__ = "AboodXD"

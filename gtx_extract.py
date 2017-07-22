@@ -28,7 +28,10 @@ import struct
 import sys
 import time
 
-import addrlib
+if platform.system() == "Windows":
+    import addrlib_cy as addrlib
+else:
+    import addrlib
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2017 AboodXD"

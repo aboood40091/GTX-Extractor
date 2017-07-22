@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v4.1
+# Version v5.0
 # Copyright © 2014 Treeki, 2015-2017 AboodXD
 
 # This file is part of GTX Extractor.
@@ -28,12 +28,7 @@ import struct
 import sys
 import time
 
-import cal_param
-
-if platform.system() == "Windows":
-    import swizzling_cy as swizzling
-else:
-    import swizzling
+import addrlib
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2017 AboodXD"
@@ -200,7 +195,7 @@ def readGFD(f):
                 width = surface.width
                 height = surface.height
 
-            surfOut = cal_param._GX2GetSurfaceInfo(surface.format_, width, height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
+            surfOut = addrlib._GX2GetSurfaceInfo(surface.format_, width, height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
 
             gfd.dim.append(surface.dim)
             gfd.width.append(surface.width)
@@ -222,10 +217,10 @@ def readGFD(f):
             gfd.surfOut.append(surfOut)
             if surface.format_ in BCn_formats:
                 gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (
-                    swizzling.surfaceGetBitsPerPixel(surface.format_) // 8))
+                    addrlib.surfaceGetBitsPerPixel(surface.format_) // 8))
             else:
                 gfd.realSize.append(
-                    surface.width * surface.height * (swizzling.surfaceGetBitsPerPixel(surface.format_) // 8))
+                    surface.width * surface.height * (addrlib.surfaceGetBitsPerPixel(surface.format_) // 8))
 
         elif block.type_ == 0x0C:
             images += 1
@@ -345,7 +340,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
                     time.sleep(5)
                     sys.exit(1)
 
-            result = swizzling.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
+            result = addrlib.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
             result = result[:size]
 
             hdr = writeHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)
@@ -408,7 +403,7 @@ def writeGFD(width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, 
             time.sleep(5)
             sys.exit(1)
 
-    swizzled_data = swizzling.swizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
+    swizzled_data = addrlib.swizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
 
     dataSize = len(swizzled_data)
 
@@ -641,7 +636,7 @@ def main():
     """
     This place is a mess...
     """
-    print("GTX Extractor v4.1")
+    print("GTX Extractor v5.0")
     print("(C) 2014 Treeki, 2015-2017 AboodXD")
 
     if len(sys.argv) != 2:
@@ -718,7 +713,7 @@ def main():
         print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
         print("  alignment       = " + str(gfd.alignment[i]))
         print("  pitch           = " + str(gfd.pitch[i]))
-        bpp = swizzling.surfaceGetBitsPerPixel(gfd.format[i])
+        bpp = addrlib.surfaceGetBitsPerPixel(gfd.format[i])
         print("")
         print("  GX2 Component Selector:")
         print("    Channel 1:      " + str(compSel[gfd.compSel[i][0]]))

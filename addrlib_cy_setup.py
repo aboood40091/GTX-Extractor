@@ -1,4 +1,4 @@
 from distutils.core import setup
 from Cython.Build import cythonize
 
-setup(ext_modules = cythonize('swizzling_cy.pyx'))
+setup(ext_modules = cythonize('addrlib_cy.pyx'))

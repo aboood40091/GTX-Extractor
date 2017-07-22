@@ -198,7 +198,7 @@ def readGFD(f):
                 width = surface.width
                 height = surface.height
 
-            surfOut = addrlib._GX2GetSurfaceInfo(surface.format_, width, height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
+            surfOut = addrlib.getSurfaceInfo(surface.format_, width, height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
 
             gfd.dim.append(surface.dim)
             gfd.width.append(surface.width)

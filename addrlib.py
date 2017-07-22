@@ -38,11 +38,11 @@ def deswizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, d
             bankSwizzle = (swizzle_ >> 9) & 3
 
             if tileMode == 0 or tileMode == 1:
-                pos = AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch)
+                pos = computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch)
             elif tileMode == 2 or tileMode == 3:
-                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode)
+                pos = computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height2, tileMode,
+                pos = computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height2, tileMode,
                                                                               pipeSwizzle, bankSwizzle)
             bpp2 = bpp
             bpp2 //= 8
@@ -68,11 +68,11 @@ def swizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, dat
             bankSwizzle = (swizzle_ >> 9) & 3
 
             if tileMode == 0 or tileMode == 1:
-                pos = AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch)
+                pos = computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch)
             elif tileMode == 2 or tileMode == 3:
-                pos = AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode)
+                pos = computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode)
             else:
-                pos = AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height2, tileMode,
+                pos = computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height2, tileMode,
                                                                               pipeSwizzle, bankSwizzle)
 
             bpp2 = bpp
@@ -301,7 +301,7 @@ def computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples=1):
     return bankSwapWidth
 
 
-def AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch):
+def computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch):
     rowOffset = y * pitch
     pixOffset = x
 
@@ -311,7 +311,7 @@ def AddrLib_computeSurfaceAddrFromCoordLinear(x, y, bpp, pitch):
     return addr
 
 
-def AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode):
+def computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode):
     microTileThickness = 1
 
     if tileMode == 3:
@@ -333,7 +333,7 @@ def AddrLib_computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode):
     return pixelOffset + microTileOffset
 
 
-def AddrLib_computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tileMode, pipeSwizzle, bankSwizzle):
+def computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height, tileMode, pipeSwizzle, bankSwizzle):
     numPipes = m_pipes
     numBanks = m_banks
     numGroupBits = m_pipeInterleaveBytesBitcount
@@ -493,19 +493,19 @@ class tileInfo:
         self.pipeConfig = 0
 
 
-def GetFillSizeFieldsFlags():
+def getFillSizeFieldsFlags():
     return (m_configFlags >> 6) & 1
 
 
-def GetSliceComputingFlags():
+def getSliceComputingFlags():
     return (m_configFlags >> 4) & 3
 
 
-def PowTwoAlign(x, align):
+def powTwoAlign(x, align):
     return ~(align - 1) & (x + align - 1)
 
 
-def NextPow2(dim):
+def nextPow2(dim):
     newDim = 1
     if dim <= 0x7FFFFFFF:
         while newDim < dim:
@@ -515,21 +515,11 @@ def NextPow2(dim):
     return newDim
 
 
-def NextPow2_0(dim):
-    newDim = 1
-    if dim <= 0x7FFFFFFF:
-        while newDim < dim:
-            newDim *= 2
-    else:
-        newDim = 2147483648
-    return newDim
-
-
-def UseTileIndex(index):
+def useTileIndex(index):
     return (m_configFlags >> 7) & 1 and index != -1
 
 
-def GetBitsPerPixel(format_):
+def getBitsPerPixel(format_):
     expandY = 1
     bitUnused = 0
     elemMode = 3
@@ -623,7 +613,7 @@ def GetBitsPerPixel(format_):
     return bpp
 
 
-def AdjustSurfaceInfo(elemMode, expandX, expandY, pBpp, pWidth, pHeight):
+def adjustSurfaceInfo(elemMode, expandX, expandY, pBpp, pWidth, pHeight):
     bBCnFormat = 0
     if pBpp:
         bpp = pBpp
@@ -671,7 +661,7 @@ def AdjustSurfaceInfo(elemMode, expandX, expandY, pBpp, pWidth, pHeight):
     return packedBits
 
 
-def HwlComputeMipLevel():
+def hwlComputeMipLevel():
     handled = 0
     if 49 <= pIn.format <= 55:
         if pIn.mipLevel:
@@ -686,8 +676,8 @@ def HwlComputeMipLevel():
                 width = max(1, widtha)
                 height = max(1, heighta)
                 slices = max(1, slices)
-            v6 = NextPow2_0(width)
-            v7 = NextPow2_0(height)
+            v6 = nextPow2(width)
+            v7 = nextPow2(height)
             pIn.width = v6
             pIn.height = v7
             pIn.numSlices = slices
@@ -695,16 +685,16 @@ def HwlComputeMipLevel():
     return handled
 
 
-def ComputeMipLevel():
+def computeMipLevel():
     slices = 0
     height = 0
     width = 0
     hwlHandled = 0
 
     if 49 <= pIn.format <= 55 and (not pIn.mipLevel or ((pIn.flags.value >> 12) & 1)):
-        pIn.width = PowTwoAlign(pIn.width, 4)
-        pIn.height = PowTwoAlign(pIn.height, 4)
-    hwlHandled = HwlComputeMipLevel()
+        pIn.width = powTwoAlign(pIn.width, 4)
+        pIn.height = powTwoAlign(pIn.height, 4)
+    hwlHandled = hwlComputeMipLevel()
     if not hwlHandled and pIn.mipLevel and ((pIn.flags.value >> 12) & 1):
         width = pIn.width
         height = pIn.height
@@ -717,15 +707,15 @@ def ComputeMipLevel():
         height = max(1, height)
         slices = max(1, slices)
         if pIn.format not in [47, 48]:
-            width = NextPow2(width)
-            height = NextPow2(height)
-            slices = NextPow2(slices)
+            width = nextPow2(width)
+            height = nextPow2(height)
+            slices = nextPow2(slices)
         pIn.width = width
         pIn.height = height
         pIn.numSlices = slices
 
 
-def R600AddrLib_ConvertToNonBankSwappedMode(tileMode):
+def convertToNonBankSwappedMode(tileMode):
     if tileMode == 8:
         expTileMode = 4
     elif tileMode == 9:
@@ -743,7 +733,7 @@ def R600AddrLib_ConvertToNonBankSwappedMode(tileMode):
     return expTileMode
 
 
-def R600AddrLib_ComputeSurfaceTileSlices(tileMode, bpp, numSamples):
+def computeSurfaceTileSlices(tileMode, bpp, numSamples):
     bytePerSample = ((bpp << 6) + 7) >> 3
     tileSlices = 1
     if computeSurfaceThickness(tileMode) > 1:
@@ -755,7 +745,7 @@ def R600AddrLib_ComputeSurfaceTileSlices(tileMode, bpp, numSamples):
     return tileSlices
 
 
-def R600AddrLib_ComputeSurfaceRotationFromTileMode(tileMode):
+def computeSurfaceRotationFromTileMode(tileMode):
     pipes = m_pipes
     result = 0
     if tileMode in [4, 5, 6, 7, 8, 9, 10, 11]:
@@ -765,13 +755,13 @@ def R600AddrLib_ComputeSurfaceRotationFromTileMode(tileMode):
     return result
 
 
-def R600AddrLib_ComputeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, height, numSlices, numSamples, isDepth,
+def computeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, height, numSlices, numSamples, isDepth,
                                                noRecursive):
     expTileMode = baseTileMode
     numPipes = m_pipes
     numBanks = m_banks
     groupBytes = m_pipeInterleaveBytes
-    tileSlices = R600AddrLib_ComputeSurfaceTileSlices(baseTileMode, bpp, numSamples)
+    tileSlices = computeSurfaceTileSlices(baseTileMode, bpp, numSamples)
     if baseTileMode == 5:
         if 2 * m_pipeInterleaveBytes > m_splitSize:
             expTileMode = 4
@@ -806,7 +796,7 @@ def R600AddrLib_ComputeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, 
             expTileMode = 7
     else:
         expTileMode = baseTileMode
-    rotation = R600AddrLib_ComputeSurfaceRotationFromTileMode(expTileMode)
+    rotation = computeSurfaceRotationFromTileMode(expTileMode)
     if not (rotation % m_pipes):
         if expTileMode == 12:
             expTileMode = 4
@@ -821,11 +811,11 @@ def R600AddrLib_ComputeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, 
     else:
         if bpp in [24, 48, 96]:
             bpp //= 3
-        widtha = NextPow2_0(width)
-        heighta = NextPow2_0(height)
-        numSlicesa = NextPow2_0(numSlices)
+        widtha = nextPow2(width)
+        heighta = nextPow2(height)
+        numSlicesa = nextPow2(numSlices)
         if level:
-            expTileMode = R600AddrLib_ConvertToNonBankSwappedMode(expTileMode)
+            expTileMode = convertToNonBankSwappedMode(expTileMode)
             thickness = computeSurfaceThickness(expTileMode)
             microTileBytes = (numSamples * bpp * (thickness << 6) + 7) >> 3
             if microTileBytes >= groupBytes:
@@ -860,7 +850,7 @@ def R600AddrLib_ComputeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, 
                     expTileMode = 4
             elif v11 == 13 and numSlicesa < 4:
                 expTileMode = 12
-            result = R600AddrLib_ComputeSurfaceMipLevelTileMode(
+            result = computeSurfaceMipLevelTileMode(
                 expTileMode,
                 bpp,
                 level,
@@ -875,7 +865,7 @@ def R600AddrLib_ComputeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, 
     return result
 
 
-def R600AddrLib_IsDualPitchAlignNeeded(tileMode, isDepth, mipLevel):
+def isDualPitchAlignNeeded(tileMode, isDepth, mipLevel):
     if isDepth or mipLevel or m_chipFamily != 1:
         needed = 0
     else:
@@ -886,11 +876,11 @@ def R600AddrLib_IsDualPitchAlignNeeded(tileMode, isDepth, mipLevel):
     return needed
 
 
-def IsPow2(dim):
+def isPow2(dim):
     return (dim & (dim - 1)) == 0
 
 
-def AddrLib__PadDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, heightAlign, sliceAlign):
+def padDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, heightAlign, sliceAlign):
     global expPitch
     global expHeight
     global expNumSlices
@@ -898,33 +888,29 @@ def AddrLib__PadDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, h
     thickness = computeSurfaceThickness(tileMode)
     if not padDims:
         padDims = 3
-    if IsPow2(pitchAlign):
-        expPitch = PowTwoAlign(expPitch, pitchAlign)
+    if isPow2(pitchAlign):
+        expPitch = powTwoAlign(expPitch, pitchAlign)
     else:
         expPitch = pitchAlign + expPitch - 1
         expPitch //= pitchAlign
         expPitch *= pitchAlign
     if padDims > 1:
-        expHeight = PowTwoAlign(expHeight, heightAlign)
+        expHeight = powTwoAlign(expHeight, heightAlign)
     if padDims > 2 or thickness > 1:
         if isCube and ((not ((m_configFlags >> 3) & 1)) or cubeAsArray):
-            expNumSlices = NextPow2(expNumSlices)
+            expNumSlices = nextPow2(expNumSlices)
         if thickness > 1:
-            expNumSlices = PowTwoAlign(expNumSlices, sliceAlign)
+            expNumSlices = powTwoAlign(expNumSlices, sliceAlign)
     return expPitch, expHeight, expNumSlices
 
 
-def PowTwoAlign_0(x, align):
-    return (x + align - 1) & ~(align - 1)
-
-
-def AddrLib__AdjustPitchAlignment(flags, pitchAlign):
+def adjustPitchAlignment(flags, pitchAlign):
     if (flags.value >> 13) & 1:
-        pitchAlign = PowTwoAlign_0(pitchAlign, 0x20)
+        pitchAlign = powTwoAlign(pitchAlign, 0x20)
     return pitchAlign
 
 
-def R600AddrLib_ComputeSurfaceAlignmentsLinear(tileMode, bpp, flags):
+def computeSurfaceAlignmentsLinear(tileMode, bpp, flags):
     if tileMode:
         if tileMode == 1:
             pixelsPerPipeInterleave = 8 * m_pipeInterleaveBytes // bpp
@@ -939,11 +925,11 @@ def R600AddrLib_ComputeSurfaceAlignmentsLinear(tileMode, bpp, flags):
         baseAlign = 1
         pitchAlign = (1 if bpp != 1 else 8)
         heightAlign = 1
-    pitchAlign = AddrLib__AdjustPitchAlignment(flags, pitchAlign)
+    pitchAlign = adjustPitchAlignment(flags, pitchAlign)
     return baseAlign, pitchAlign, heightAlign
 
 
-def R600AddrLib_ComputeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, height, numSlices, mipLevel, padDims, flags):
+def computeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, height, numSlices, mipLevel, padDims, flags):
     global expPitch
     global expHeight
     global expNumSlices
@@ -953,13 +939,13 @@ def R600AddrLib_ComputeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, heigh
     expHeight = height
     expNumSlices = numSlices
     microTileThickness = computeSurfaceThickness(tileMode)
-    baseAlign, pitchAlign, heightAlign = R600AddrLib_ComputeSurfaceAlignmentsLinear(tileMode, bpp, flags)
+    baseAlign, pitchAlign, heightAlign = computeSurfaceAlignmentsLinear(tileMode, bpp, flags)
     if ((flags.value >> 9) & 1) and not mipLevel:
         expPitch //= 3
-        expPitch = NextPow2_0(expPitch)
+        expPitch = nextPow2(expPitch)
     if mipLevel:
-        expPitch = NextPow2_0(expPitch)
-        expHeight = NextPow2_0(expHeight)
+        expPitch = nextPow2(expPitch)
+        expHeight = nextPow2(expHeight)
         if (flags.value >> 4) & 1:
             expNumSlices = numSlices
             if numSlices <= 1:
@@ -967,8 +953,8 @@ def R600AddrLib_ComputeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, heigh
             else:
                 padDims = 0
         else:
-            expNumSlices = NextPow2_0(numSlices)
-    expPitch, expHeight, expNumSlices = AddrLib__PadDimensions(
+            expNumSlices = nextPow2(numSlices)
+    expPitch, expHeight, expNumSlices = padDimensions(
         tileMode,
         padDims,
         (flags.value >> 4) & 1,
@@ -991,18 +977,18 @@ def R600AddrLib_ComputeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, heigh
     return valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign
 
 
-def R600AddrLib_ComputeSurfaceAlignmentsMicroTiled(tileMode, bpp, flags, numSamples):
+def computeSurfaceAlignmentsMicroTiled(tileMode, bpp, flags, numSamples):
     if bpp in [24, 48, 96]:
         bpp //= 3
     v8 = computeSurfaceThickness(tileMode)
     baseAlign = m_pipeInterleaveBytes
     pitchAlign = max(8, m_pipeInterleaveBytes // bpp // numSamples // v8)
     heightAlign = 8
-    pitchAlign = AddrLib__AdjustPitchAlignment(flags, pitchAlign)
+    pitchAlign = adjustPitchAlignment(flags, pitchAlign)
     return baseAlign, pitchAlign, heightAlign
 
 
-def R600AddrLib_ComputeSurfaceInfoMicroTiled(tileMode, bpp, numSamples, pitch, height, numSlices, mipLevel, padDims,
+def computeSurfaceInfoMicroTiled(tileMode, bpp, numSamples, pitch, height, numSlices, mipLevel, padDims,
                                              flags):
     global expPitch
     global expHeight
@@ -1015,8 +1001,8 @@ def R600AddrLib_ComputeSurfaceInfoMicroTiled(tileMode, bpp, numSamples, pitch, h
     expNumSlices = numSlices
     microTileThickness = computeSurfaceThickness(tileMode)
     if mipLevel:
-        expPitch = NextPow2_0(pitch)
-        expHeight = NextPow2_0(height)
+        expPitch = nextPow2(pitch)
+        expHeight = nextPow2(height)
         if (flags.value >> 4) & 1:
             expNumSlices = numSlices
             if numSlices <= 1:
@@ -1024,16 +1010,16 @@ def R600AddrLib_ComputeSurfaceInfoMicroTiled(tileMode, bpp, numSamples, pitch, h
             else:
                 padDims = 0
         else:
-            expNumSlices = NextPow2_0(numSlices)
+            expNumSlices = nextPow2(numSlices)
         if expTileMode == 3 and expNumSlices < 4:
             expTileMode = 2
             microTileThickness = 1
-    baseAlign, pitchAlign, heightAlign = R600AddrLib_ComputeSurfaceAlignmentsMicroTiled(
+    baseAlign, pitchAlign, heightAlign = computeSurfaceAlignmentsMicroTiled(
         expTileMode,
         bpp,
         flags,
         numSamples)
-    expPitch, expHeight, expNumSlices = AddrLib__PadDimensions(
+    expPitch, expHeight, expNumSlices = padDimensions(
         expTileMode,
         padDims,
         (flags.value >> 4) & 1,
@@ -1053,7 +1039,7 @@ def R600AddrLib_ComputeSurfaceInfoMicroTiled(tileMode, bpp, numSamples, pitch, h
     return valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign
 
 
-def R600AddrLib_IsDualBaseAlignNeeded(tileMode):
+def isDualBaseAlignNeeded(tileMode):
     needed = 1
     if m_chipFamily == 1:
         if tileMode >= 0 and tileMode <= 3:
@@ -1063,7 +1049,7 @@ def R600AddrLib_IsDualBaseAlignNeeded(tileMode):
     return needed
 
 
-def R600AddrLib_ComputeSurfaceAlignmentsMacroTiled(tileMode, bpp, flags, numSamples):
+def computeSurfaceAlignmentsMacroTiled(tileMode, bpp, flags, numSamples):
     groupBytes = m_pipeInterleaveBytes
     numBanks = m_banks
     numPipes = m_pipes
@@ -1077,7 +1063,7 @@ def R600AddrLib_ComputeSurfaceAlignmentsMacroTiled(tileMode, bpp, flags, numSamp
     macroTileWidth = 8 * numBanks // aspectRatio
     macroTileHeight = aspectRatio * 8 * numPipes
     pitchAlign = max(macroTileWidth, macroTileWidth * (groupBytes // bpp // (8 * thickness) // numSamples))
-    pitchAlign = AddrLib__AdjustPitchAlignment(flags, pitchAlign)
+    pitchAlign = adjustPitchAlignment(flags, pitchAlign)
     heightAlign = macroTileHeight
     macroTileBytes = numSamples * ((bpp * macroTileHeight * macroTileWidth + 7) >> 3)
     if m_chipFamily == 1 and numSamples == 1:
@@ -1093,14 +1079,14 @@ def R600AddrLib_ComputeSurfaceAlignmentsMacroTiled(tileMode, bpp, flags, numSamp
         v11 = microTileBytes // splitBytes
     numSlicesPerMicroTile = v11
     baseAlign //= v11
-    if R600AddrLib_IsDualBaseAlignNeeded(tileMode):
+    if isDualBaseAlignNeeded(tileMode):
         macroBytes = (bpp * macroTileHeight * macroTileWidth + 7) >> 3
         if baseAlign // macroBytes % 2:
             baseAlign += macroBytes
     return baseAlign, pitchAlign, heightAlign, macroTileWidth, macroTileHeight
 
 
-def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch, height, numSlices,
+def computeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch, height, numSlices,
                                              mipLevel, padDims, flags):
     global expPitch
     global expHeight
@@ -1113,13 +1099,13 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
     expTileMode = tileMode
     microTileThickness = computeSurfaceThickness(tileMode)
     if mipLevel:
-        expPitch = NextPow2_0(pitch)
-        expHeight = NextPow2_0(height)
+        expPitch = nextPow2(pitch)
+        expHeight = nextPow2(height)
         if (flags.value >> 4) & 1:
             expNumSlices = numSlices
             padDims = 2 if numSlices <= 1 else 0
         else:
-            expNumSlices = NextPow2_0(numSlices)
+            expNumSlices = nextPow2(numSlices)
         if expTileMode == 7 and expNumSlices < 4:
             expTileMode = 4
             microTileThickness = 1
@@ -1127,7 +1113,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
         or not mipLevel
         or not isThickMacroTiled(baseTileMode)
         or isThickMacroTiled(tileMode)):
-        baseAlign, pitchAlign, heightAlign, macroWidth, macroHeight = R600AddrLib_ComputeSurfaceAlignmentsMacroTiled(
+        baseAlign, pitchAlign, heightAlign, macroWidth, macroHeight = computeSurfaceAlignmentsMacroTiled(
             tileMode,
             bpp,
             flags,
@@ -1135,7 +1121,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
         bankSwappedWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples)
         if bankSwappedWidth > pitchAlign:
             pitchAlign = bankSwappedWidth
-        if R600AddrLib_IsDualPitchAlignNeeded(tileMode, (flags.value >> 1) & 1, mipLevel):
+        if isDualPitchAlignNeeded(tileMode, (flags.value >> 1) & 1, mipLevel):
             v21 = (m_pipeInterleaveBytes >> 3) // bpp // numSamples
             tilePerGroup = v21 // computeSurfaceThickness(tileMode)
             if not tilePerGroup:
@@ -1147,7 +1133,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
                 and not evenWidth
                 and (expPitch > macroWidth or not evenHeight and expHeight > macroHeight)):
                 expPitch += macroWidth
-        expPitch, expHeight, expNumSlices = AddrLib__PadDimensions(
+        expPitch, expHeight, expNumSlices = padDimensions(
             tileMode,
             padDims,
             (flags.value >> 4) & 1,
@@ -1166,7 +1152,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
         pDepthAlign = microTileThickness
         result = valid
     else:
-        baseAlign, pitchAlign, heightAlign, macroWidth, macroHeight = R600AddrLib_ComputeSurfaceAlignmentsMacroTiled(
+        baseAlign, pitchAlign, heightAlign, macroWidth, macroHeight = computeSurfaceAlignmentsMacroTiled(
             baseTileMode,
             bpp,
             flags,
@@ -1177,7 +1163,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
         if expPitch < pitchAlign * pitchAlignFactor or expHeight < heightAlign:
             expTileMode = 2
 
-            result, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = R600AddrLib_ComputeSurfaceInfoMicroTiled(
+            result, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoMicroTiled(
                 2,
                 bpp,
                 numSamples,
@@ -1188,7 +1174,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
                 padDims,
                 flags)
         else:
-            baseAlign, pitchAlign, heightAlign, macroWidth, macroHeight = R600AddrLib_ComputeSurfaceAlignmentsMacroTiled(
+            baseAlign, pitchAlign, heightAlign, macroWidth, macroHeight = computeSurfaceAlignmentsMacroTiled(
                 tileMode,
                 bpp,
                 flags,
@@ -1196,7 +1182,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
             bankSwappedWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples)
             if bankSwappedWidth > pitchAlign:
                 pitchAlign = bankSwappedWidth
-            if R600AddrLib_IsDualPitchAlignNeeded(tileMode, (flags.value >> 1) & 1, mipLevel):
+            if isDualPitchAlignNeeded(tileMode, (flags.value >> 1) & 1, mipLevel):
                 v21 = (m_pipeInterleaveBytes >> 3) // bpp // numSamples
                 tilePerGroup = v21 // computeSurfaceThickness(tileMode)
                 if not tilePerGroup:
@@ -1205,7 +1191,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
                 evenWidth = (expPitch - 1) // macroWidth & 1
                 if numSamples == 1 and tilePerGroup == 1 and not evenWidth and (expPitch > macroWidth or not evenHeight and expHeight > macroHeight):
                     expPitch += macroWidth
-            expPitch, expHeight, expNumSlices = AddrLib__PadDimensions(
+            expPitch, expHeight, expNumSlices = padDimensions(
                 tileMode,
                 padDims,
                 (flags.value >> 4) & 1,
@@ -1226,7 +1212,7 @@ def R600AddrLib_ComputeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSam
     return result, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign
 
 
-def ComputeSurfaceInfoEx():
+def computeSurfaceInfoEx():
     tileMode = pIn.tileMode
     bpp = pIn.bpp
     if pIn.numSamples:
@@ -1254,9 +1240,9 @@ def ComputeSurfaceInfoEx():
     if ((flags.value >> 4) & 1) and not mipLevel:
         padDims = 2
     if ((flags.value >> 6) & 1):
-        tileMode = R600AddrLib_ConvertToNonBankSwappedMode(tileMode)
+        tileMode = convertToNonBankSwappedMode(tileMode)
     else:
-        tileMode = R600AddrLib_ComputeSurfaceMipLevelTileMode(
+        tileMode = computeSurfaceMipLevelTileMode(
             tileMode,
             bpp,
             mipLevel,
@@ -1267,7 +1253,7 @@ def ComputeSurfaceInfoEx():
             (flags.value >> 1) & 1,
             0)
     if tileMode in [0, 1]:
-        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = R600AddrLib_ComputeSurfaceInfoLinear(
+        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoLinear(
             tileMode,
             bpp,
             numSamples,
@@ -1279,7 +1265,7 @@ def ComputeSurfaceInfoEx():
             flags)
         pTileModeOut = tileMode
     elif tileMode in [2, 3]:
-        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = R600AddrLib_ComputeSurfaceInfoMicroTiled(
+        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoMicroTiled(
             tileMode,
             bpp,
             numSamples,
@@ -1290,7 +1276,7 @@ def ComputeSurfaceInfoEx():
             padDims,
             flags)
     elif tileMode in [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]:
-        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = R600AddrLib_ComputeSurfaceInfoMacroTiled(
+        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoMacroTiled(
             tileMode,
             baseTileMode,
             bpp,
@@ -1318,7 +1304,7 @@ def ComputeSurfaceInfoEx():
     return result
 
 
-def RestoreSurfaceInfo(elemMode, expandX, expandY, bpp):
+def restoreSurfaceInfo(elemMode, expandX, expandY, bpp):
     if bpp:
         if elemMode == 4:
             originalBits = expandY * expandX * bpp
@@ -1358,7 +1344,7 @@ def RestoreSurfaceInfo(elemMode, expandX, expandY, bpp):
     return bpp
 
 
-def ComputeSurfaceInfo(aSurfIn, pSurfOut):
+def computeSurfaceInfo(aSurfIn, pSurfOut):
     global pIn
     pIn = aSurfIn
     global pOut
@@ -1381,27 +1367,27 @@ def ComputeSurfaceInfo(aSurfIn, pSurfOut):
     global expandX
 
     returnCode = 0
-    if GetFillSizeFieldsFlags() == 1 and (pIn.size != 60 or pOut.size != 96):  # --> m_configFlags.value = 4
+    if getFillSizeFieldsFlags() == 1 and (pIn.size != 60 or pOut.size != 96):  # --> m_configFlags.value = 4
         returnCode = 6
     # v3 = pIn
     if pIn.bpp > 0x80:
         returnCode = 3
     if returnCode == ADDR_OK:
         v18 = 0
-        ComputeMipLevel()
+        computeMipLevel()
         width = pIn.width
         height = pIn.height
         bpp = pIn.bpp
         expandX = 1
         expandY = 1
-        sliceFlags = GetSliceComputingFlags()
+        sliceFlags = getSliceComputingFlags()
         tileInfoNull.banks = 0
         tileInfoNull.bankWidth = 0
         tileInfoNull.bankHeight = 0
         tileInfoNull.macroAspectRatio = 0
         tileInfoNull.tileSplitBytes = 0
         tileInfoNull.pipeConfig = 0
-        if UseTileIndex(pIn.tileIndex) and (not pIn.pTileInfo):
+        if useTileIndex(pIn.tileIndex) and (not pIn.pTileInfo):
             if pOut.pTileInfo:
                 pIn.pTileInfo = pOut.pTileInfo
             else:
@@ -1414,13 +1400,13 @@ def ComputeSurfaceInfo(aSurfIn, pSurfOut):
             if pIn.format:
                 v18 = 1
                 v4 = pIn.format
-                bpp = GetBitsPerPixel(v4)
+                bpp = getBitsPerPixel(v4)
                 if elemMode == 4 and expandX == 3 and pIn.tileMode == 1:
                     pIn.flags.value |= 0x200
                 v6 = expandY
                 v7 = expandX
                 v8 = elemMode
-                bpp = AdjustSurfaceInfo(v8, v7, v6, bpp, width, height)
+                bpp = adjustSurfaceInfo(v8, v7, v6, bpp, width, height)
             elif pIn.bpp:
                 if pIn.width:
                     v17 = pIn.width
@@ -1435,7 +1421,7 @@ def ComputeSurfaceInfo(aSurfIn, pSurfOut):
             else:
                 returnCode = 3
         if returnCode == ADDR_OK:
-            returnCode = ComputeSurfaceInfoEx()
+            returnCode = computeSurfaceInfoEx()
         if returnCode == ADDR_OK:
             pOut.bpp = pIn.bpp
             pOut.pixelPitch = pOut.pitch
@@ -1446,7 +1432,7 @@ def ComputeSurfaceInfo(aSurfIn, pSurfOut):
                 v10 = expandY
                 v11 = expandX
                 v12 = elemMode
-                bpp = RestoreSurfaceInfo(v12, v11, v10, bpp)
+                bpp = restoreSurfaceInfo(v12, v11, v10, bpp)
             if sliceFlags:
                 if sliceFlags == 1:
                     pOut.sliceSize = (pOut.height * pOut.pitch * pOut.bpp * pIn.numSamples + 7) // 8
@@ -1463,7 +1449,7 @@ def ComputeSurfaceInfo(aSurfIn, pSurfOut):
             pOut.sliceTileMax = sliceTileMax
 
 
-def _GX2GetSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, surfaceDim, surfaceTileMode, surfaceAA,
+def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, surfaceDim, surfaceTileMode, surfaceAA,
                        level):
     v3 = 0
     v4 = 0
@@ -1675,5 +1661,5 @@ def _GX2GetSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth,
             aSurfIn.flags.value |= 0x20
         aSurfIn.flags.value = ((1 if level == 0 else 0) << 12) | aSurfIn.flags.value & 0xFFFFEFFF
         pSurfOut.size = 96
-        ComputeSurfaceInfo(aSurfIn, pSurfOut)
+        computeSurfaceInfo(aSurfIn, pSurfOut)
         return pOut

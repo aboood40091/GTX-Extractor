@@ -4,5 +4,5 @@ __pycache__/
 build/
 dist/
 build.bat
-build_swizzling_cy.bat
+build_addrlib_cy.bat
 *.spec

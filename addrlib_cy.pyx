@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.0
-# Copyright © 2014 Treeki, 2015-2017 AboodXD
+# Version v5.1
+# Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -104,7 +104,7 @@ cpdef bytearray swizzle(int width, int height, int height2, int format_, int til
 # Credits:
 #  -AddrLib: actual code
 #  -Exzap: modifying code to apply to Wii U textures
-#  -AboodXD: porting, code improvements and cleaning up
+#  -Stella/AboodXD: porting, code improvements and cleaning up
 
 cdef int m_banks = 4
 cdef int m_banksBitcount = 2
@@ -998,7 +998,7 @@ cdef tuple computeSurfaceAlignmentsLinear(int tileMode, int bpp, flags):
     return baseAlign, pitchAlign, heightAlign
 
 
-cdef int computeSurfaceInfoLinear(int tileMode, int bpp, int numSamples, int pitch, int height, int numSlices, int mipLevel, int padDims, flags):
+cdef tuple computeSurfaceInfoLinear(int tileMode, int bpp, int numSamples, int pitch, int height, int numSlices, int mipLevel, int padDims, flags):
     global expPitch
     global expHeight
     global expNumSlices

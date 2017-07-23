@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.0
-# Copyright © 2014 Treeki, 2015-2017 AboodXD
+# Version v5.1
+# Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -32,9 +32,11 @@ try:
 except ImportError:
     import addrlib
 
+import dds
+
 __author__ = "AboodXD"
-__copyright__ = "Copyright 2014 Treeki, 2015-2017 AboodXD"
-__credits__ = ["AboodXD", "Treeki", "AddrLib", "Exzap"]
+__copyright__ = "Copyright 2014 Treeki, 2015-2017 Stella/AboodXD"
+__credits__ = ["Stella/AboodXD", "Treeki", "AddrLib", "Exzap"]
 
 formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x0000001a: 'GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM',
@@ -61,7 +63,6 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
 BCn_formats = [0x31, 0x431, 0x32, 0x432, 0x33, 0x433, 0x34, 0x234, 0x35, 0x235]
 
 
-# ----------\/-Start of GTX Extracting section-\/------------- #
 class GFDData:
     pass
 
@@ -345,7 +346,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
             result = addrlib.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
             result = result[:size]
 
-            hdr = writeHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)
+            hdr = dds.generateHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)
 
     else:
         print("")
@@ -362,376 +363,238 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
     return hdr, result
 
 
-def writeGFD(width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, imageSize, f, f1, surfOut):
-    if format_ in formats:
-        if aa != 0:
-            print("")
-            print("Unsupported aa!")
-            print("Exiting in 5 seconds...")
-            time.sleep(5)
-            sys.exit(1)
+def writeGFD(f, tileMode, swizzle_, SRGB):
+    width, height, format_, dataSize, compSel, data = dds.readDDS(f, SRGB)
 
-        if format_ == 0x00:
-            print("")
-            print("Invalid texture format!")
-            print("Exiting in 5 seconds...")
-            time.sleep(5)
-            sys.exit(1)
-
+    if format_ in BCn_formats:
+        width_ = (width + 3) >> 2
+        height_ = (height + 3) >> 2
+        if format_ in [0x31, 0x431, 0x234, 0x34]:
+            align = 0xEE4
         else:
-            if format_ not in BCn_formats:
-                bpp = struct.unpack("<I", f1[0x14:0x18])[0] // width
-                dataSize = bpp * width * height
-            else:
-                dataSize = struct.unpack("<I", f1[0x14:0x18])[0]
-
-            if not dataSize < imageSize:
-                data = f1[0x80:0x80 + imageSize]
-            else:
-                data = f1[0x80:0x80 + dataSize]
-                data += b'\x00' * (imageSize - dataSize)
-
+            align = 0x1EE4
     else:
+        width_ = width
+        height_ = height
+        align = 0x6E4
+
+    bpp = addrlib.surfaceGetBitsPerPixel(format_) >> 3
+
+    alignment = 512 * bpp
+
+    surfOut = addrlib.getSurfaceInfo(format_, width_, height_, 1, 1, tileMode, 0, 0)
+
+    padSize = surfOut.surfSize - dataSize
+    data += padSize * b"\x00"
+
+    if surfOut.depth != 1:
         print("")
-        print("Unsupported texture format_: " + hex(format_))
+        print("Unsupported depth!")
         print("Exiting in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
 
-    if surfOut.depth != 1:
-            print("")
-            print("Unsupported depth!")
-            print("Exiting in 5 seconds...")
-            time.sleep(5)
-            sys.exit(1)
-
-    swizzled_data = addrlib.swizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
-
-    dataSize = len(swizzled_data)
-
-    pos = 0
-    header = GFDHeader()
-    header.data(f, pos)
-    pos += header.size
-
-    while pos < len(f):  # Loop through the entire file.
-        block = GFDBlockHeader()
-        block.data(f, pos)
-
-        pos += block.size
-
-        if block.type_ == 0x0B:
-            offset = pos
-
-            pos += block.dataSize
-
-        elif block.type_ == 0x0C:
-            head1 = f[:pos]  # it works :P
-            offset1 = pos
-            pos += block.dataSize
-
-        else:
-            pos += block.dataSize
-
-    head1 = bytearray(head1)
-    head1[offset + 0x10:offset + 0x14] = bytes(bytearray.fromhex("00000001"))  # numMips
-    head1[offset + 0x78:offset + 0x7C] = bytes(bytearray.fromhex("00000001"))  # numMips, again
-    head1[offset + 0x28:offset + 0x2C] = bytes(bytearray.fromhex("00000000"))  # mipSize
-    head1[offset + 0x20:offset + 0x24] = int(dataSize).to_bytes(4, 'big')  # imageSize
-    head1[offset1 - 0x0C:offset1 - 0x08] = int(dataSize).to_bytes(4, 'big')  # dataSize
-
-    head2 = bytes(bytearray.fromhex("424C4B7B00000020000000010000000000000001000000000000000000000000"))
-
-    return bytes(head1) + bytes(swizzled_data) + head2
-
-
-# ----------\/-Start of DDS writer section-\/---------- #
-
-# Copyright © 2016-2017 AboodXD
-
-# Supported formats:
-#  -RGBA8
-#  -RGB10A2
-#  -RGB565
-#  -RGB5A1
-#  -RGBA4
-#  -L8
-#  -L8A8
-#  -L4A4
-#  -BC1_UNORM
-#  -BC2_UNORM
-#  -BC3_UNORM
-#  -BC4_UNORM
-#  -BC4_SNORM
-#  -BC5_UNORM
-#  -BC5_SNORM
-
-# Feel free to include this in your own program if you want, just give credits. :)
-
-def writeHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
-    hdr = bytearray(128)
-
-    if format_ == 28:  # RGBA8
-        fmtbpp = 4
-        has_alpha = 1
-        rmask = 0x000000ff
-        gmask = 0x0000ff00
-        bmask = 0x00ff0000
-        amask = 0xff000000
-
-    elif format_ == 24:  # RGB10A2
-        fmtbpp = 4
-        has_alpha = 1
-        rmask = 0x000003ff
-        gmask = 0x000ffc00
-        bmask = 0x3ff00000
-        amask = 0xc0000000
-
-    elif format_ == 85:  # RGB565
-        fmtbpp = 2
-        has_alpha = 0
-        rmask = 0x0000001f
-        gmask = 0x000007e0
-        bmask = 0x0000f800
-        amask = 0x00000000
-
-    elif format_ == 86:  # RGB5A1
-        fmtbpp = 2
-        has_alpha = 1
-        rmask = 0x0000001f
-        gmask = 0x000003e0
-        bmask = 0x00007c00
-        amask = 0x00008000
-
-    elif format_ == 115:  # RGBA4
-        fmtbpp = 2
-        has_alpha = 1
-        rmask = 0x0000000f
-        gmask = 0x000000f0
-        bmask = 0x00000f00
-        amask = 0x0000f000
-
-    elif format_ == 61:  # L8
-        fmtbpp = 1
-        has_alpha = 0
-        rmask = 0x000000ff
-        gmask = 0x000000ff
-        bmask = 0x000000ff
-        amask = 0x00000000
-
-    elif format_ == 49:  # L8A8
-        fmtbpp = 2
-        has_alpha = 1
-        rmask = 0x000000ff
-        gmask = 0x000000ff
-        bmask = 0x000000ff
-        amask = 0x0000ff00
-
-    elif format_ == 112:  # L4A4
-        fmtbpp = 1
-        has_alpha = 1
-        rmask = 0x0000000f
-        gmask = 0x0000000f
-        bmask = 0x0000000f
-        amask = 0x000000f0
-
-    flags = 0x00000001 | 0x00001000 | 0x00000004 | 0x00000002
-
-    caps = 0x00001000
-
-    if num_mipmaps == 0:
-        num_mipmaps = 1
-    elif num_mipmaps != 1:
-        flags |= 0x00020000
-        caps |= 0x00000008 | 0x00400000
-
-    if not compressed:
-        flags |= 0x00000008
-
-        if fmtbpp == 1 or format_ == 49:  # LUMINANCE
-            pflags = 0x00020000
-
-        else:  # RGB
-            pflags = 0x00000040
-
-        if has_alpha != 0:
-            pflags |= 0x00000001
-
-        size = w * fmtbpp
-
+    if tileMode in [1, 2, 3, 16]:
+        s = 0
     else:
-        flags |= 0x00080000
-        pflags = 0x00000004
+        s = 0xd0000
 
-        if format_ == "BC1":
-            fourcc = b'DXT1'
-        elif format_ == "BC2":
-            fourcc = b'DXT3'
-        elif format_ == "BC3":
-            fourcc = b'DXT5'
-        elif format_ == "BC4U":
-            fourcc = b'BC4U'
-        elif format_ == "BC4S":
-            fourcc = b'BC4S'
-        elif format_ == "BC5U":
-            fourcc = b'BC5U'
-        elif format_ == "BC5S":
-            fourcc = b'BC5S'
+    s |= swizzle_ << 8
 
-    hdr[:4] = b'DDS '
-    hdr[4:4 + 4] = 124 .to_bytes(4, 'little')
-    hdr[8:8 + 4] = flags.to_bytes(4, 'little')
-    hdr[12:12 + 4] = h.to_bytes(4, 'little')
-    hdr[16:16 + 4] = w.to_bytes(4, 'little')
-    hdr[20:20 + 4] = size.to_bytes(4, 'little')
-    hdr[28:28 + 4] = num_mipmaps.to_bytes(4, 'little')
-    hdr[76:76 + 4] = 32 .to_bytes(4, 'little')
-    hdr[80:80 + 4] = pflags.to_bytes(4, 'little')
+    compSels = ["Red", "Green", "Blue", "Alpha", "0", "1"]
 
-    if compressed:
-        hdr[84:84 + 4] = fourcc
-    else:
-        hdr[88:88 + 4] = (fmtbpp << 3).to_bytes(4, 'little')
+    print("")
+    print("// ----- GX2Surface Info ----- ")
+    print("  dim             = 1")
+    print("  width           = " + str(width))
+    print("  height          = " + str(height))
+    print("  depth           = 1")
+    print("  numMips         = 1")
+    print("  format          = " + formats[format_])
+    print("  aa              = 0")
+    print("  use             = 1")
+    print("  imageSize       = " + str(len(data)))
+    print("  mipSize         = 0")
+    print("  tileMode        = " + str(tileMode))
+    print("  swizzle         = " + str(s) + ", " + hex(s))
+    print("  alignment       = " + str(alignment))
+    print("  pitch           = " + str(surfOut.pitch))
+    print("")
+    print("  GX2 Component Selector:")
+    print("    Channel 1:      " + str(compSels[compSel[0]]))
+    print("    Channel 2:      " + str(compSels[compSel[1]]))
+    print("    Channel 3:      " + str(compSels[compSel[2]]))
+    print("    Channel 4:      " + str(compSels[compSel[3]]))
+    print("")
+    print("  bits per pixel  = " + str(bpp << 3))
+    print("  bytes per pixel = " + str(bpp))
+    print("  realSize        = " + str(dataSize))
 
-        if compSel[0] == 1:
-            hdr[92:92 + 4] = gmask.to_bytes(4, 'little')
-        elif compSel[0] == 2:
-            hdr[92:92 + 4] = bmask.to_bytes(4, 'little')
-        elif compSel[0] == 3:
-            hdr[92:92 + 4] = amask.to_bytes(4, 'little')
-        else:
-            hdr[92:92 + 4] = rmask.to_bytes(4, 'little')
+    swizzled_data = addrlib.swizzle(width, height, surfOut.height, format_, surfOut.tileMode, s, surfOut.pitch, surfOut.bpp, data)
 
-        if compSel[1] == 0:
-            hdr[96:96 + 4] = rmask.to_bytes(4, 'little')
-        elif compSel[1] == 2:
-            hdr[96:96 + 4] = bmask.to_bytes(4, 'little')
-        elif compSel[1] == 3:
-            hdr[96:96 + 4] = amask.to_bytes(4, 'little')
-        else:
-            hdr[96:96 + 4] = gmask.to_bytes(4, 'little')
+    head_struct = GFDHeader()
+    head = head_struct.pack(b"Gfx2", 32, 7, 1, 2, 1, 0, 0)
 
-        if compSel[2] == 0:
-            hdr[100:100 + 4] = rmask.to_bytes(4, 'little')
-        elif compSel[2] == 1:
-            hdr[100:100 + 4] = gmask.to_bytes(4, 'little')
-        elif compSel[2] == 3:
-            hdr[100:100 + 4] = amask.to_bytes(4, 'little')
-        else:
-            hdr[100:100 + 4] = bmask.to_bytes(4, 'little')
+    block_head_struct = GFDBlockHeader()
+    gx2surf_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xb, 0x9c, 0, 0)
 
-        if compSel[3] == 0:
-            hdr[104:104 + 4] = rmask.to_bytes(4, 'little')
-        elif compSel[3] == 1:
-            hdr[104:104 + 4] = gmask.to_bytes(4, 'little')
-        elif compSel[3] == 2:
-            hdr[104:104 + 4] = bmask.to_bytes(4, 'little')
-        else:
-            hdr[104:104 + 4] = amask.to_bytes(4, 'little')
+    gx2surf_struct = GX2Surface()
+    gx2surf = gx2surf_struct.pack(1, width, height, 1, 1, format_, 0, 1, len(swizzled_data), 0, 0, 0, tileMode, s, alignment, surfOut.pitch)
 
-    hdr[108:108 + 4] = caps.to_bytes(4, 'little')
+    align_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, align, 0, 0)
 
-    return hdr
+    image_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xc, len(swizzled_data), 0, 0)
+
+    eof_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 1, 0, 0, 0)
+
+    output = head + gx2surf_blk_head + gx2surf
+    output += b"\x00" * 56
+    output += 1 .to_bytes(4, 'big')
+    output += b"\x00" * 4
+    output += 1 .to_bytes(4, 'big')
+
+    for value in compSel:
+        output += value.to_bytes(1, 'big')
+
+    output += b"\x00" * 20
+    output += align_blk_head
+    output += b"\x00" * align
+    output += image_blk_head
+    output += swizzled_data
+    output += eof_blk_head
+
+    return output
+
+
+def printInfo():
+    print("")
+    print("Usage:")
+    print("  gtx_extract [option...] input")
+    print("")
+    print("Options:")
+    print(" -o <output>           Output file, if not specified, the output file will have the same name as the intput file")
+    print("                       Will be ignored if the GTX has multiple images")
+    print("")
+    print("DDS to GTX options:")
+    print(" -tileMode <tileMode>  tileMode (4 is the default)")
+    print(" -swizzle <swizzle>    the intial swizzle value, a value from 0 to 7 (0 is the default)")
+    print(" -SRGB <n>             1 if the desired destination format is SRGB, else 0 (0 is the default)")
+    print("")
+    print("Supported formats:")
+    print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_SRGB")
+    print(" - GX2_SURFACE_FORMAT_TCS_R10_G10_B10_A2_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TCS_R5_G6_B5_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TC_R5_G5_B5_A1_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TC_R4_G4_B4_A4_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TC_R8_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TC_R8_G8_UNORM")
+    print(" - GX2_SURFACE_FORMAT_TC_R4_G4_UNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC1_UNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC1_SRGB")
+    print(" - GX2_SURFACE_FORMAT_T_BC2_UNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC2_SRGB")
+    print(" - GX2_SURFACE_FORMAT_T_BC3_UNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC3_SRGB")
+    print(" - GX2_SURFACE_FORMAT_T_BC4_UNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC4_SNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC5_UNORM")
+    print(" - GX2_SURFACE_FORMAT_T_BC5_SNORM")
+    print("")
+    print("Exiting in 5 seconds...")
+    time.sleep(5)
+    sys.exit(1)
 
 
 def main():
-    """
-    This place is a mess...
-    """
-    print("GTX Extractor v5.0")
-    print("(C) 2014 Treeki, 2015-2017 AboodXD")
+    print("GTX Extractor v5.1")
+    print("(C) 2014 Treeki, 2015-2017 Stella/AboodXD")
 
-    if len(sys.argv) != 2:
-        if len(sys.argv) != 3:
-            print("")
-            print("Usage (If converting from .gtx to .dds, and using source code): python gtx_extract.py input")
-            print("Usage (If converting from .gtx to .dds, and using exe): gtx_extract.exe input")
-            print(
-                "Usage (If converting from .dds to .gtx, and using source code): python gtx_extract.py input(.dds) input(.gtx)")
-            print("Usage (If converting from .dds to .gtx, and using exe): gtx_extract.exe input(.dds) input(.gtx)")
-            print("")
-            print("Supported formats:")
-            print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_SRGB")
-            print(" - GX2_SURFACE_FORMAT_TCS_R10_G10_B10_A2_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TCS_R5_G6_B5_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TC_R5_G5_B5_A1_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TC_R4_G4_B4_A4_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TC_R8_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TC_R8_G8_UNORM")
-            print(" - GX2_SURFACE_FORMAT_TC_R4_G4_UNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC1_UNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC1_SRGB")
-            print(" - GX2_SURFACE_FORMAT_T_BC2_UNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC2_SRGB")
-            print(" - GX2_SURFACE_FORMAT_T_BC3_UNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC3_SRGB")
-            print(" - GX2_SURFACE_FORMAT_T_BC4_UNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC4_SNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC5_UNORM")
-            print(" - GX2_SURFACE_FORMAT_T_BC5_SNORM")
-            print("")
-            print("Exiting in 5 seconds...")
-            time.sleep(5)
-            sys.exit(1)
+    input_ = sys.argv[-1]
 
-    if sys.argv[1].endswith('.gtx'):
-        with open(sys.argv[1], "rb") as inf:
-            print('Converting: ' + sys.argv[1])
-            inb = inf.read()
-            inf.close()
+    if not (input_.endswith('.gtx') or input_.endswith('.dds')):
+        printInfo()
 
-    elif sys.argv[1].endswith('.dds'):
-        with open(sys.argv[2], "rb") as inf:
-            with open(sys.argv[1], "rb") as img:
-                print('Converting: ' + sys.argv[1])
-                inb = inf.read()
-                img1 = img.read()
-                inf.close()
-                img.close()
+    toGTX = False
 
-    compSel = ["Red", "Green", "Blue", "Alpha", "0", "1"]
+    if input_.endswith('.dds'):
+        toGTX = True
 
-    gfd = readGFD(inb)
+    if "-o" in sys.argv:
+        output_ = sys.argv[sys.argv.index("-o") + 1]
+    else:
+        output_ = os.path.splitext(input_)[0] + (".gtx" if toGTX else ".dds")
 
-    for i in range(gfd.numImages):
+    print("")
+    print('Converting: ' + input_)
 
-        print("")
-        print("// ----- GX2Surface Info ----- ")
-        print("  dim             = " + str(gfd.dim[i]))
-        print("  width           = " + str(gfd.width[i]))
-        print("  height          = " + str(gfd.height[i]))
-        print("  depth           = " + str(gfd.depth[i]))
-        print("  numMips         = " + str(gfd.numMips[i]))
-        if gfd.format[i] in formats:
-            print("  format          = " + formats[gfd.format[i]])
+    if toGTX:
+        if "-tileMode" in sys.argv:
+            tileMode = int(sys.argv[sys.argv.index("-tileMode") + 1], 0)
         else:
-            print("  format          = " + hex(gfd.format[i]))
-        print("  aa              = " + str(gfd.aa[i]))
-        print("  use             = " + str(gfd.use[i]))
-        print("  imageSize       = " + str(gfd.imageSize[i]))
-        print("  mipSize         = " + str(gfd.mipSize[i]))
-        print("  tileMode        = " + str(gfd.tileMode[i]))
-        print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
-        print("  alignment       = " + str(gfd.alignment[i]))
-        print("  pitch           = " + str(gfd.pitch[i]))
-        bpp = addrlib.surfaceGetBitsPerPixel(gfd.format[i])
-        print("")
-        print("  GX2 Component Selector:")
-        print("    Channel 1:      " + str(compSel[gfd.compSel[i][0]]))
-        print("    Channel 2:      " + str(compSel[gfd.compSel[i][1]]))
-        print("    Channel 3:      " + str(compSel[gfd.compSel[i][2]]))
-        print("    Channel 4:      " + str(compSel[gfd.compSel[i][3]]))
-        print("")
-        print("  bits per pixel  = " + str(bpp))
-        print("  bytes per pixel = " + str(bpp // 8))
-        print("  realSize        = " + str(gfd.realSize[i]))
+            tileMode = 4
 
-        name = os.path.splitext(sys.argv[1])[0]
+        if "-swizzle" in sys.argv:
+            swizzle = int(sys.argv[sys.argv.index("-swizzle") + 1], 0)
+        else:
+            swizzle = 0
 
-        if sys.argv[1].endswith('.gtx'):
+        if "-SRGB" in sys.argv:
+            SRGB = int(sys.argv[sys.argv.index("-SRGB") + 1], 0)
+        else:
+            SRGB = 0
+
+        if SRGB > 1 or not 0 <= tileMode <= 16 or not 0 <= swizzle <= 7:
+            printInfo()
+
+        data = writeGFD(input_, tileMode, swizzle, SRGB)
+
+        with open(output_, "wb+") as output:
+            output.write(data)
+
+    else:
+        with open(input_, "rb") as inf:
+            inb = inf.read()
+
+        compSel = ["Red", "Green", "Blue", "Alpha", "0", "1"]
+
+        gfd = readGFD(inb)
+
+        for i in range(gfd.numImages):
+
+            print("")
+            print("// ----- GX2Surface Info ----- ")
+            print("  dim             = " + str(gfd.dim[i]))
+            print("  width           = " + str(gfd.width[i]))
+            print("  height          = " + str(gfd.height[i]))
+            print("  depth           = " + str(gfd.depth[i]))
+            print("  numMips         = " + str(gfd.numMips[i]))
+            if gfd.format[i] in formats:
+                print("  format          = " + formats[gfd.format[i]])
+            else:
+                print("  format          = " + hex(gfd.format[i]))
+            print("  aa              = " + str(gfd.aa[i]))
+            print("  use             = " + str(gfd.use[i]))
+            print("  imageSize       = " + str(gfd.imageSize[i]))
+            print("  mipSize         = " + str(gfd.mipSize[i]))
+            print("  tileMode        = " + str(gfd.tileMode[i]))
+            print("  swizzle         = " + str(gfd.swizzle[i]) + ", " + hex(gfd.swizzle[i]))
+            print("  alignment       = " + str(gfd.alignment[i]))
+            print("  pitch           = " + str(gfd.pitch[i]))
+            bpp = addrlib.surfaceGetBitsPerPixel(gfd.format[i])
+            print("")
+            print("  GX2 Component Selector:")
+            print("    Channel 1:      " + str(compSel[gfd.compSel[i][0]]))
+            print("    Channel 2:      " + str(compSel[gfd.compSel[i][1]]))
+            print("    Channel 3:      " + str(compSel[gfd.compSel[i][2]]))
+            print("    Channel 4:      " + str(compSel[gfd.compSel[i][3]]))
+            print("")
+            print("  bits per pixel  = " + str(bpp))
+            print("  bytes per pixel = " + str(bpp // 8))
+            print("  realSize        = " + str(gfd.realSize[i]))
+
             if gfd.numImages > 1:
-                name += str(i)
+                output_  = os.path.splitext(input_)[0] + str(i) + ".dds"
 
             hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.dim[i],
                                             gfd.format[i],gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i],
@@ -740,37 +603,12 @@ def main():
             if data == b'':
                 pass
             else:
-                output = open(name + '.dds', 'wb+')
-                output.write(hdr)
-                output.write(data)
-                output.close()
-
-        elif sys.argv[1].endswith('.dds'):
-            if gfd.numImages > 1:
-                print("")
-                print("Nope, you still can't do this... :P")
-                print("")
-                print("Exiting in 5 seconds...")
-                time.sleep(5)
-                sys.exit(1)
-
-            data = writeGFD(gfd.width[i], gfd.height[i], gfd.depth[i], gfd.dim[i], gfd.format[i], gfd.aa[i],
-                            gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i], gfd.imageSize[i], inb, img1, gfd.surfOut[i])
-
-            if os.path.isfile(name + ".gtx"):
-                # i = 2
-                # while os.path.isfile(name + str(i) + ".gtx"):
-                #    i += 1
-                # output = open(name + str(i) + ".gtx", 'wb+')
-                output = open(name + "2.gtx", 'wb+')
-            else:
-                output = open(name + ".gtx", 'wb+')
-
-            output.write(data)
-            output.close()
+                with open(output_, "wb+") as output:
+                    output.write(hdr)
+                    output.write(data)
 
     print('')
-    print('Finished converting: ' + sys.argv[1])
+    print('Finished converting: ' + input_)
 
 
 if __name__ == '__main__':

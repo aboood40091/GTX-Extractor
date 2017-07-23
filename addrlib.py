@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.0
-# Copyright © 2014 Treeki, 2015-2017 AboodXD
+# Version v5.1
+# Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -89,7 +89,7 @@ def swizzle(width, height, height2, format_, tileMode, swizzle_, pitch, bpp, dat
 # Credits:
 #  -AddrLib: actual code
 #  -Exzap: modifying code to apply to Wii U textures
-#  -AboodXD: porting, code improvements and cleaning up
+#  -Stella/AboodXD: porting, code improvements and cleaning up
 
 m_banks = 4
 m_banksBitcount = 2

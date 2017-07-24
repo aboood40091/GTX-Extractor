@@ -70,9 +70,9 @@ def readDDS(f, SRGB):
 
     rgba8_masks = [0xff, 0xff00, 0xff0000, 0xff000000, 0]
     rgb10a2_masks = [0x3ff, 0xffc00, 0x3ff00000, 0xc0000000]
-    rgb565_masks = [0x1f, 0x7e0, 0xf800, 0]
-    rgb5a1_masks = [0x1f, 0x3e0, 0x7c00, 0x8000]
-    rgba4_masks = [0xf, 0xf0, 0xf00, 0xf000]
+    rgb565_masks = [0xf800, 0x7e0, 0x1f, 0]
+    rgb5a1_masks = [0x7c00, 0x3e0, 0x1f, 0x8000]
+    rgba4_masks = [0xf00, 0xf0, 0xf, 0xf000]
     l8_masks = [0xff, 0]
     l8a8_masks = [0xff, 0xff00]
     l4a4_masks = [0xf, 0xf0]
@@ -307,38 +307,38 @@ def readDDS(f, SRGB):
                         format_ = 0xa
 
                         if channel0 == 0x1f:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel0 == 0x3e0:
                             compSel.append(1)
                         elif channel0 == 0x7c00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel0 == 0x8000:
                             compSel.append(3)
 
                         if channel1 == 0x1f:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel1 == 0x3e0:
                             compSel.append(1)
                         elif channel1 == 0x7c00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel1 == 0x8000:
                             compSel.append(3)
 
                         if channel2 == 0x1f:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel2 == 0x3e0:
                             compSel.append(1)
                         elif channel2 == 0x7c00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel2 == 0x8000:
                             compSel.append(3)
 
                         if channel3 == 0x1f:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel3 == 0x3e0:
                             compSel.append(1)
                         elif channel3 == 0x7c00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel3 == 0x8000:
                             compSel.append(3)
 
@@ -346,38 +346,38 @@ def readDDS(f, SRGB):
                         format_ = 0xb
 
                         if channel0 == 0xf:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel0 == 0xf0:
                             compSel.append(1)
                         elif channel0 == 0xf00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel0 == 0xf000:
                             compSel.append(3)
 
                         if channel1 == 0xf:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel1 == 0xf0:
                             compSel.append(1)
                         elif channel1 == 0xf00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel1 == 0xf000:
                             compSel.append(3)
 
                         if channel2 == 0xf:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel2 == 0xf0:
                             compSel.append(1)
                         elif channel2 == 0xf00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel2 == 0xf000:
                             compSel.append(3)
 
                         if channel3 == 0xf:
-                            compSel.append(0)
+                            compSel.append(2)
                         elif channel3 == 0xf0:
                             compSel.append(1)
                         elif channel3 == 0xf00:
-                            compSel.append(2)
+                            compSel.append(0)
                         elif channel3 == 0xf000:
                             compSel.append(3)
 
@@ -433,38 +433,38 @@ def readDDS(f, SRGB):
                     format_ = 8
 
                     if channel0 == 0x1f:
-                        compSel.append(0)
+                        compSel.append(2)
                     elif channel0 == 0x7e0:
                         compSel.append(1)
                     elif channel0 == 0xf800:
-                        compSel.append(2)
+                        compSel.append(0)
                     elif channel0 == 0:
                         compSel.append(4)
 
                     if channel1 == 0x1f:
-                        compSel.append(0)
+                        compSel.append(2)
                     elif channel1 == 0x7e0:
                         compSel.append(1)
                     elif channel1 == 0xf800:
-                        compSel.append(2)
+                        compSel.append(0)
                     elif channel1 == 0:
                         compSel.append(4)
 
                     if channel2 == 0x1f:
-                        compSel.append(0)
+                        compSel.append(2)
                     elif channel2 == 0x7e0:
                         compSel.append(1)
                     elif channel2 == 0xf800:
-                        compSel.append(2)
+                        compSel.append(0)
                     elif channel2 == 0:
                         compSel.append(4)
 
                     if channel3 == 0x1f:
-                        compSel.append(0)
+                        compSel.append(2)
                     elif channel3 == 0x7e0:
                         compSel.append(1)
                     elif channel3 == 0xf800:
-                        compSel.append(2)
+                        compSel.append(0)
                     elif channel3 == 0:
                         compSel.append(4)
 
@@ -515,25 +515,25 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     elif format_ == 85:  # RGB565
         fmtbpp = 2
         has_alpha = 0
-        rmask = 0x0000001f
+        rmask = 0x0000f800
         gmask = 0x000007e0
-        bmask = 0x0000f800
+        bmask = 0x0000001f
         amask = 0x00000000
 
     elif format_ == 86:  # RGB5A1
         fmtbpp = 2
         has_alpha = 1
-        rmask = 0x0000001f
+        rmask = 0x00007c00
         gmask = 0x000003e0
-        bmask = 0x00007c00
+        bmask = 0x0000001f
         amask = 0x00008000
 
     elif format_ == 115:  # RGBA4
         fmtbpp = 2
         has_alpha = 1
-        rmask = 0x0000000f
+        rmask = 0x00000f00
         gmask = 0x000000f0
-        bmask = 0x00000f00
+        bmask = 0x0000000f
         amask = 0x0000f000
 
     elif format_ == 61:  # L8
@@ -603,7 +603,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif format_ == "BC3":
             fourcc = b'DXT5'
         elif format_ == "BC4U":
-            fourcc = b'BC4U'
+            fourcc = b'ATI1'
         elif format_ == "BC4S":
             fourcc = b'BC4S'
         elif format_ == "BC5U":

@@ -1473,10 +1473,10 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
         width = ~(v24 - 1) & ((surfaceWidth >> level) + v24 - 1)
         if hwFormat == 0x35:
             return
-        pSurfOut.bpp = formatHwInfo[hwFormat]
+        pSurfOut.bpp = formatHwInfo[hwFormat * 4]
         pSurfOut.size = 96
         pSurfOut.pitch = width // blockSize
-        pSurfOut.pixelBits = formatHwInfo[hwFormat]
+        pSurfOut.pixelBits = formatHwInfo[hwFormat * 4]
         pSurfOut.baseAlign = 1
         pSurfOut.pitchAlign = 1
         pSurfOut.heightAlign = 1
@@ -1564,7 +1564,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
         aSurfIn.size = 60
         aSurfIn.tileMode = surfaceTileMode & 0xF
         aSurfIn.format = hwFormat
-        aSurfIn.bpp = formatHwInfo[hwFormat]
+        aSurfIn.bpp = formatHwInfo[hwFormat * 4]
         aSurfIn.numSamples = 1 << surfaceAA
         aSurfIn.numFrags = aSurfIn.numSamples
         aSurfIn.width = surfaceWidth >> level

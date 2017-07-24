@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# GTX Extractor
-# Version v5.1
-# Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
-
-# This file is part of GTX Extractor.
-
-# GTX Extractor is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# GTX Extractor is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# Copyright © 2016-2017 Stella/AboodXD
 
 # Supported formats:
 #  -RGBA8
@@ -29,6 +12,7 @@
 #  -L8
 #  -L8A8
 #  -L4A4
+#  -ETC1
 #  -BC1
 #  -BC2
 #  -BC3
@@ -39,9 +23,9 @@
 
 # Feel free to include this in your own program if you want, just give credits. :)
 
-"""dds.py: DDS reader and writer."""
+"""dds.py: DDS reader and header generator."""
 
-import struct, sys
+import struct, sys, time
 
 def readDDS(f, SRGB):
     with open(f, "rb") as inf:
@@ -101,7 +85,7 @@ def readDDS(f, SRGB):
     if pflags == 4:
         compressed = True
 
-    elif pflags == 0x20000:
+    elif pflags == 0x20000 or pflags == 2:
         luminance = True
 
     elif pflags == 0x20001:
@@ -120,7 +104,11 @@ def readDDS(f, SRGB):
     if compressed:
         compSel = [0, 1, 2, 3]
 
-        if fourcc == b'DXT1':
+        if fourcc == b'ETC1':
+            format_ = 0x31
+            bpp = 8
+
+        elif fourcc == b'DXT1':
             format_ = 0x431 if SRGB else 0x31
             bpp = 8
 
@@ -207,22 +195,22 @@ def readDDS(f, SRGB):
                     format_ = 1
 
                     if channel0 == 0xff:
-                        compSel.append(0)
+                        compSel.append(3 if pflags == 2 else 0)
                     elif channel0 == 0:
                         compSel.append(4)
 
                     if channel1 == 0xff:
-                        compSel.append(0)
+                        compSel.append(3 if pflags == 2 else 0)
                     elif channel1 == 0:
                         compSel.append(4)
 
                     if channel2 == 0xff:
-                        compSel.append(0)
+                        compSel.append(3 if pflags == 2 else 0)
                     elif channel2 == 0:
                         compSel.append(4)
 
                     if channel3 == 0xff:
-                        compSel.append(0)
+                        compSel.append(3 if pflags == 2 else 0)
                     elif channel3 == 0:
                         compSel.append(4)
         elif rgb:
@@ -502,7 +490,7 @@ def readDDS(f, SRGB):
 
     # insert "RGB8 to RGBA8" here
 
-    return width, height, format_, size, compSel, data
+    return width, height, format_, fourcc, size, compSel, data
 
 
 def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
@@ -555,6 +543,9 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         gmask = 0x000000ff
         bmask = 0x000000ff
         amask = 0x00000000
+        if compSel.count(3) == 1:
+            has_alpha = 1
+            amask = 0x000000ff
 
     elif format_ == 49:  # L8A8
         fmtbpp = 2
@@ -585,13 +576,16 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     if not compressed:
         flags |= 0x00000008
 
-        if fmtbpp == 1 or format_ == 49:  # LUMINANCE
+        if (fmtbpp == 1 and not has_alpha) or format_ == 49:  # LUMINANCE
             pflags = 0x00020000
+
+        elif fmtbpp == 1 and has_alpha:
+            pflags = 0x00000002
 
         else:  # RGB
             pflags = 0x00000040
 
-        if has_alpha != 0:
+        if has_alpha and fmtbpp != 1:
             pflags |= 0x00000001
 
         size = w * fmtbpp
@@ -600,7 +594,9 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         flags |= 0x00080000
         pflags = 0x00000004
 
-        if format_ == "BC1":
+        if format_ == "ETC1":
+            fourcc = b'ETC1'
+        elif format_ == "BC1":
             fourcc = b'DXT1'
         elif format_ == "BC2":
             fourcc = b'DXT3'
@@ -611,7 +607,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif format_ == "BC4S":
             fourcc = b'BC4S'
         elif format_ == "BC5U":
-            fourcc = b'BC5U'
+            fourcc = b'ATI2'
         elif format_ == "BC5S":
             fourcc = b'BC5S'
 
@@ -648,7 +644,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif compSel[1] == 3:
             hdr[96:96 + 4] = amask.to_bytes(4, 'little')
         elif compSel[1] == 4:
-            hdr[92:92 + 4] = 0 .to_bytes(4, 'little')
+            hdr[96:96 + 4] = 0 .to_bytes(4, 'little')
         else:
             hdr[96:96 + 4] = gmask.to_bytes(4, 'little')
 
@@ -659,7 +655,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif compSel[2] == 3:
             hdr[100:100 + 4] = amask.to_bytes(4, 'little')
         elif compSel[2] == 4:
-            hdr[92:92 + 4] = 0 .to_bytes(4, 'little')
+            hdr[100:100 + 4] = 0 .to_bytes(4, 'little')
         else:
             hdr[100:100 + 4] = bmask.to_bytes(4, 'little')
 
@@ -670,7 +666,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif compSel[3] == 2:
             hdr[104:104 + 4] = bmask.to_bytes(4, 'little')
         elif compSel[3] == 4:
-            hdr[92:92 + 4] = 0 .to_bytes(4, 'little')
+            hdr[104:104 + 4] = 0 .to_bytes(4, 'little')
         else:
             hdr[104:104 + 4] = amask.to_bytes(4, 'little')
 

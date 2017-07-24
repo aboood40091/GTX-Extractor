@@ -34,7 +34,7 @@ except ImportError:
 
 import dds
 
-__author__ = "AboodXD"
+__author__ = "Stella/AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2017 Stella/AboodXD"
 __credits__ = ["Stella/AboodXD", "Treeki", "AddrLib", "Exzap"]
 
@@ -192,8 +192,8 @@ def readGFD(f):
             pos += 24
 
             if surface.format_ in BCn_formats:
-                width = surface.width // 4
-                height = surface.height // 4
+                width = (surface.width + 3) // 4
+                height = (surface.height + 3) // 4
             else:
                 width = surface.width
                 height = surface.height
@@ -364,7 +364,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
 
 
 def writeGFD(f, tileMode, swizzle_, SRGB):
-    width, height, format_, dataSize, compSel, data = dds.readDDS(f, SRGB)
+    width, height, format_, fourcc, dataSize, compSel, data = dds.readDDS(f, SRGB)
 
     if format_ in BCn_formats:
         width_ = (width + 3) >> 2

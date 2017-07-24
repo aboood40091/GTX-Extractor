@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# GTX Extractor
-# Version v5.1
-# Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
+# Copyright © 2016-2017 Stella/AboodXD
 
-# This file is part of GTX Extractor.
-
-# GTX Extractor is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# GTX Extractor is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# Credits:
+#  -AddrLib: actual code
+#  -Exzap: modifying code to apply to Wii U textures
+#  -Stella/AboodXD: porting, code improvements and cleaning up
 
 """addrlib_cy.pyx: a Cython AddrLib Library for Wii U textures."""
 
@@ -100,11 +88,6 @@ cpdef bytearray swizzle(int width, int height, int height2, int format_, int til
 
     return result
 
-
-# Credits:
-#  -AddrLib: actual code
-#  -Exzap: modifying code to apply to Wii U textures
-#  -Stella/AboodXD: porting, code improvements and cleaning up
 
 cdef int m_banks = 4
 cdef int m_banksBitcount = 2

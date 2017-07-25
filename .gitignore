@@ -5,4 +5,5 @@ build/
 dist/
 build.bat
 build_addrlib_cy.bat
+build_form_conv_cy.bat
 *.spec

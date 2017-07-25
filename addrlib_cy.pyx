@@ -1733,4 +1733,6 @@ cpdef getSurfaceInfo(int surfaceFormat, int surfaceWidth, int surfaceHeight, int
         aSurfIn.flags.value = ((1 if level == 0 else 0) << 12) | aSurfIn.flags.value & 0xFFFFEFFF
         pSurfOut.size = 96
         computeSurfaceInfo(aSurfIn, pSurfOut)
-        return pOut
+        pSurfOut = pOut
+
+    return pSurfOut

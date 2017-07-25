@@ -34,6 +34,11 @@ except ImportError:
 
 import dds
 
+try:
+    import form_conv_cy as form_conv
+except ImportError:
+    import form_conv
+
 __author__ = "Stella/AboodXD"
 __copyright__ = "Copyright 2014 Treeki, 2015-2017 Stella/AboodXD"
 __credits__ = ["Stella/AboodXD", "Treeki", "AddrLib", "Exzap"]
@@ -345,6 +350,11 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
 
             result = addrlib.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
             result = result[:size]
+
+            if flim.format == 0xa:
+                result = form_conv.toDDSrgb5a1(result)
+            elif flim.format == 0xb:
+                result = form_conv.toDDSrgba4(result)
 
             hdr = dds.generateHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)
 

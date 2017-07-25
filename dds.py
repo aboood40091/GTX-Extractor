@@ -27,6 +27,11 @@
 
 import struct, sys, time
 
+try:
+    import form_conv_cy as form_conv
+except ImportError:
+    import form_conv
+
 def readDDS(f, SRGB):
     with open(f, "rb") as inf:
         inb = inf.read()
@@ -261,7 +266,7 @@ def readDDS(f, SRGB):
                         elif channel3 == 0xff000000:
                             compSel.append(3)
                         elif channel3 == 0:
-                            compSel.append(4)
+                            compSel.append(5)
 
                     elif channel0 in rgb10a2_masks and channel1 in rgb10a2_masks and channel2 in rgb10a2_masks and channel3 in rgb10a2_masks:
                         format_ = 0x19
@@ -427,7 +432,7 @@ def readDDS(f, SRGB):
                     elif channel3 == 0xff000000:
                         compSel.append(3)
                     elif channel3 == 0:
-                        compSel.append(4)
+                        compSel.append(5)
 
                 if channel0 in rgb565_masks and channel1 in rgb565_masks and channel2 in rgb565_masks and channel3 in rgb565_masks and bpp == 2:
                     format_ = 8
@@ -488,7 +493,14 @@ def readDDS(f, SRGB):
 
     data = inb[0x80:0x80+size]
 
-    # insert "RGB8 to RGBA8" here
+    if format_ == 0xa:
+        data = form_conv.toGX2rgb5a1(data)
+    elif format_ == 0xb:
+        data = form_conv.toGX2rgba4(data)
+    elif format_ in [0x1a, 0x41a] and bpp == 3:
+        data = form_conv.rgb8torgbx8(data)
+        bpp += 1
+        size = width * height * bpp
 
     return width, height, format_, fourcc, size, compSel, data
 

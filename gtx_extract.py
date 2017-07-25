@@ -351,9 +351,9 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
             result = addrlib.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
             result = result[:size]
 
-            if flim.format == 0xa:
+            if format_ == 0xa:
                 result = form_conv.toDDSrgb5a1(result)
-            elif flim.format == 0xb:
+            elif format_ == 0xb:
                 result = form_conv.toDDSrgba4(result)
 
             hdr = dds.generateHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)

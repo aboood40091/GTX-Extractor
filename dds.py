@@ -74,6 +74,7 @@ def readDDS(f, SRGB):
         sys.exit(1)
 
     rgba8_masks = [0xff, 0xff00, 0xff0000, 0xff000000, 0]
+    rgb8_masks = [0xff, 0xff00, 0xff0000, 0]
     rgb10a2_masks = [0x3ff, 0xffc00, 0x3ff00000, 0xc0000000]
     rgb565_masks = [0xf800, 0x7e0, 0x1f, 0]
     rgb5a1_masks = [0x7c00, 0x3e0, 0x1f, 0x8000]
@@ -387,7 +388,7 @@ def readDDS(f, SRGB):
                             compSel.append(3)
 
             else:
-                if channel0 in rgba8_masks and channel1 in rgba8_masks and channel2 in rgba8_masks and channel3 in rgba8_masks and bpp == 3:
+                if channel0 in rgb8_masks and channel1 in rgb8_masks and channel2 in rgb8_masks and channel3 in rgb8_masks and bpp == 3:
                     format_ = 0x41a if SRGB else 0x1a
 
                     if channel0 == 0xff:
@@ -396,8 +397,6 @@ def readDDS(f, SRGB):
                         compSel.append(1)
                     elif channel0 == 0xff0000:
                         compSel.append(2)
-                    elif channel0 == 0xff000000:
-                        compSel.append(3)
                     elif channel0 == 0:
                         compSel.append(4)
 
@@ -407,8 +406,6 @@ def readDDS(f, SRGB):
                         compSel.append(1)
                     elif channel1 == 0xff0000:
                         compSel.append(2)
-                    elif channel1 == 0xff000000:
-                        compSel.append(3)
                     elif channel1 == 0:
                         compSel.append(4)
 
@@ -418,8 +415,6 @@ def readDDS(f, SRGB):
                         compSel.append(1)
                     elif channel2 == 0xff0000:
                         compSel.append(2)
-                    elif channel2 == 0xff000000:
-                        compSel.append(3)
                     elif channel2 == 0:
                         compSel.append(4)
 
@@ -429,8 +424,6 @@ def readDDS(f, SRGB):
                         compSel.append(1)
                     elif channel3 == 0xff0000:
                         compSel.append(2)
-                    elif channel3 == 0xff000000:
-                        compSel.append(3)
                     elif channel3 == 0:
                         compSel.append(5)
 

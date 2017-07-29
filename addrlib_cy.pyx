@@ -663,8 +663,8 @@ cdef int adjustSurfaceInfo(int elemMode, int expandX, int expandY, int pBpp, int
         else:
             packedBits = pBpp
         pIn.bpp = packedBits
-    if pIn.width:
-        if pIn.height:
+    if pWidth:
+        if pHeight:
             width = pWidth
             height = pHeight
             if expandX > 1 or expandY > 1:

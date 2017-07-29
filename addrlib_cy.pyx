@@ -447,9 +447,6 @@ cdef int ADDR_OK = 0
 
 pIn = None
 pOut = None
-cdef int elemMode = 0
-cdef int expandY = 0
-cdef int expandX = 0
 
 cdef int expPitch = 0
 cdef int expHeight = 0
@@ -542,11 +539,11 @@ cdef int useTileIndex(int index):
     return (m_configFlags >> 7) & 1 and index != -1
 
 
-cdef int getBitsPerPixel(int format_):
-    expandY = 1
+cdef tuple getBitsPerPixel(int format_):
+    cdef int expandY = 1
     cdef int bitUnused = 0
-    elemMode = 3
-    cdef int bpp
+    cdef int elemMode = 3
+    cdef int bpp, expandX
     if format_ == 1:
         bpp = 8
         expandX = 1
@@ -634,7 +631,7 @@ cdef int getBitsPerPixel(int format_):
     else:
         bpp = 0
         expandX = 1
-    return bpp
+    return bpp, expandX, expandY, elemMode
 
 
 cdef int adjustSurfaceInfo(int elemMode, int expandX, int expandY, int pBpp, int pWidth, int pHeight):
@@ -1439,10 +1436,10 @@ def computeSurfaceInfo(aSurfIn, pSurfOut):
     cdef int width
     cdef int height
     cdef int bpp
+    cdef int elemMode
+    cdef int expandY
+    cdef int expandX
     cdef int sliceTileMax
-    global elemMode
-    global expandY
-    global expandX
 
     returnCode = 0
     if getFillSizeFieldsFlags() == 1 and (pIn.size != 60 or pOut.size != 96):  # --> m_configFlags.value = 4
@@ -1472,7 +1469,7 @@ def computeSurfaceInfo(aSurfIn, pSurfOut):
             if pIn.format:
                 v18 = 1
                 v4 = pIn.format
-                bpp = getBitsPerPixel(v4)
+                bpp, expandX, expandY, elemMode = getBitsPerPixel(v4)
                 if elemMode == 4 and expandX == 3 and pIn.tileMode == 1:
                     pIn.flags.value |= 0x200
                 v6 = expandY

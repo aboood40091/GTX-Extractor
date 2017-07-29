@@ -404,9 +404,6 @@ ADDR_OK = 0
 
 pIn = None
 pOut = None
-elemMode = 0
-expandY = 0
-expandX = 0
 
 baseAlign = 0
 pitchAlign = 0
@@ -593,7 +590,7 @@ def getBitsPerPixel(format_):
     else:
         bpp = 0
         expandX = 1
-    return bpp
+    return bpp, expandX, expandY, elemMode
 
 
 def adjustSurfaceInfo(elemMode, expandX, expandY, pBpp, pWidth, pHeight):
@@ -617,8 +614,8 @@ def adjustSurfaceInfo(elemMode, expandX, expandY, pBpp, pWidth, pHeight):
         else:
             packedBits = pBpp
         pIn.bpp = packedBits
-    if pIn.width:
-        if pIn.height:
+    if pWidth:
+        if pHeight:
             width = pWidth
             height = pHeight
             if expandX > 1 or expandY > 1:
@@ -1345,9 +1342,6 @@ def computeSurfaceInfo(aSurfIn, pSurfOut):
     v18 = 0
     tileInfoNull = tileInfo()
     sliceFlags = 0
-    global elemMode
-    global expandY
-    global expandX
 
     returnCode = 0
     if getFillSizeFieldsFlags() == 1 and (pIn.size != 60 or pOut.size != 96):  # --> m_configFlags.value = 4
@@ -1383,7 +1377,7 @@ def computeSurfaceInfo(aSurfIn, pSurfOut):
             if pIn.format:
                 v18 = 1
                 v4 = pIn.format
-                bpp = getBitsPerPixel(v4)
+                bpp, expandX, expandY, elemMode = getBitsPerPixel(v4)
                 if elemMode == 4 and expandX == 3 and pIn.tileMode == 1:
                     pIn.flags.value |= 0x200
                 v6 = expandY

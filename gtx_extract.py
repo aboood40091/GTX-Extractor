@@ -196,14 +196,7 @@ def readGFD(f):
 
             pos += 24
 
-            if surface.format_ in BCn_formats:
-                width = (surface.width + 3) // 4
-                height = (surface.height + 3) // 4
-            else:
-                width = surface.width
-                height = surface.height
-
-            surfOut = addrlib.getSurfaceInfo(surface.format_, width, height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
+            surfOut = addrlib.getSurfaceInfo(surface.format_, surface.width, surface.height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
 
             gfd.dim.append(surface.dim)
             gfd.width.append(surface.width)
@@ -377,22 +370,18 @@ def writeGFD(f, tileMode, swizzle_, SRGB):
     width, height, format_, fourcc, dataSize, compSel, data = dds.readDDS(f, SRGB)
 
     if format_ in BCn_formats:
-        width_ = (width + 3) >> 2
-        height_ = (height + 3) >> 2
         if format_ in [0x31, 0x431, 0x234, 0x34]:
             align = 0xEE4
         else:
             align = 0x1EE4
     else:
-        width_ = width
-        height_ = height
         align = 0x6E4
 
     bpp = addrlib.surfaceGetBitsPerPixel(format_) >> 3
 
     alignment = 512 * bpp
 
-    surfOut = addrlib.getSurfaceInfo(format_, width_, height_, 1, 1, tileMode, 0, 0)
+    surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, 0)
 
     padSize = surfOut.surfSize - dataSize
     data += padSize * b"\x00"

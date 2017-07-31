@@ -25,7 +25,7 @@
 
 """dds.py: DDS reader and header generator."""
 
-import struct, sys, time
+import struct
 
 try:
     import form_conv_cy as form_conv
@@ -38,11 +38,8 @@ def readDDS(f, SRGB):
 
     if len(inb) < 0x80 or inb[:4] != b'DDS ':
         print("")
-        print("Input is not a valid DDS file!")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        print(f + " is not a valid DDS file!")
+        return 0, 0, 0, b'', 0, [], 0, []
 
     width = struct.unpack("<I", inb[16:20])[0]
     height = struct.unpack("<I", inb[12:16])[0]
@@ -52,10 +49,7 @@ def readDDS(f, SRGB):
     if fourcc == b'DX10':
         print("")
         print("DX10 DDS files are not supported.")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        return 0, 0, 0, b'', 0, [], 0, []
 
     pflags = struct.unpack("<I", inb[80:84])[0]
     bpp = struct.unpack("<I", inb[88:92])[0] >> 3
@@ -68,10 +62,7 @@ def readDDS(f, SRGB):
     if caps not in [0x1000, 0x401008]:
         print("")
         print("Invalid texture.")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        return 0, 0, 0, b'', 0, [], 0, []
 
     rgba8_masks = [0xff, 0xff00, 0xff0000, 0xff000000, 0]
     rgb8_masks = [0xff, 0xff00, 0xff0000, 0]
@@ -104,6 +95,11 @@ def readDDS(f, SRGB):
     elif pflags == 0x41:
         rgb = True
         has_alpha = True
+
+    else:
+        print("")
+        print("Invalid texture.")
+        return 0, 0, 0, b'', 0, [], 0, []
 
     format_ = 0
 
@@ -142,7 +138,7 @@ def readDDS(f, SRGB):
             format_ = 0x235
             bpp = 16
 
-        size = ((width + 3) // 4) * ((height + 3) // 4) * bpp
+        size = ((width + 3) >> 2) * ((height + 3) >> 2) * bpp
 
     else:
         compSel = []
@@ -155,22 +151,22 @@ def readDDS(f, SRGB):
                     if channel0 == 0xff:
                         compSel.append(0)
                     elif channel0 == 0xff00:
-                        compSel.append(3)
+                        compSel.append(1)
 
                     if channel1 == 0xff:
                         compSel.append(0)
                     elif channel1 == 0xff00:
-                        compSel.append(3)
+                        compSel.append(1)
 
                     if channel2 == 0xff:
                         compSel.append(0)
                     elif channel2 == 0xff00:
-                        compSel.append(3)
+                        compSel.append(1)
 
                     if channel3 == 0xff:
                         compSel.append(0)
                     elif channel3 == 0xff00:
-                        compSel.append(3)
+                        compSel.append(1)
                         
 
                 elif channel0 in l4a4_masks and channel1 in l4a4_masks and channel2 in l4a4_masks and channel3 in l4a4_masks and bpp == 1:
@@ -179,22 +175,22 @@ def readDDS(f, SRGB):
                     if channel0 == 0xf:
                         compSel.append(0)
                     elif channel0 == 0xf0:
-                        compSel.append(3)
+                        compSel.append(1)
 
                     if channel1 == 0xf:
                         compSel.append(0)
                     elif channel1 == 0xf0:
-                        compSel.append(3)
+                        compSel.append(1)
 
                     if channel2 == 0xf:
                         compSel.append(0)
                     elif channel2 == 0xf0:
-                        compSel.append(3)
+                        compSel.append(1)
 
                     if channel3 == 0xf:
                         compSel.append(0)
                     elif channel3 == 0xf0:
-                        compSel.append(3)
+                        compSel.append(1)
 
             else:
                 if channel0 in l8_masks and channel1 in l8_masks and channel2 in l8_masks and channel3 in l8_masks and bpp == 1:
@@ -468,23 +464,25 @@ def readDDS(f, SRGB):
 
         size = width * height * bpp
 
-    if len(inb) < 0x80+size:
+    if caps == 0x401008:
+        numMips = struct.unpack("<I", inb[28:32])[0] - 1
+        mipSize = get_mipSize(width, height, bpp, numMips, compressed)
+    else:
+        numMips = 0
+        mipSize = 0
+
+    if len(inb) < 0x80+size+mipSize:
         print("")
-        print("Input is not a valid DDS file!")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        print(f + " is not a valid DDS file!")
+        return 0, 0, 0, b'', 0, [], 0, []
 
     if format_ == 0:
         print("")
         print("Unsupported DDS format!")
-        print("")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        return 0, 0, 0, b'', 0, [], 0, []
 
-    data = inb[0x80:0x80+size]
+    
+    data = inb[0x80:0x80+size+mipSize]
 
     if format_ == 0xa:
         data = form_conv.toGX2rgb5a1(data)
@@ -495,7 +493,18 @@ def readDDS(f, SRGB):
         bpp += 1
         size = width * height * bpp
 
-    return width, height, format_, fourcc, size, compSel, data
+    return width, height, format_, fourcc, size, compSel, numMips, data
+
+
+def get_mipSize(width, height, bpp, numMips, compressed):
+    size = 0
+    for i in range(numMips):
+        level = i + 1
+        if compressed:
+            size += ((max(1, width >> level) + 3) >> 2) * ((max(1, height >> level) + 3) >> 2) * bpp
+        else:
+            size += max(1, width >> level) * max(1, height >> level) * bpp
+    return size
 
 
 def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
@@ -556,17 +565,17 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         fmtbpp = 2
         has_alpha = 1
         rmask = 0x000000ff
-        gmask = 0x000000ff
-        bmask = 0x000000ff
-        amask = 0x0000ff00
+        gmask = 0x0000ff00
+        bmask = 0x00000000
+        amask = 0x00000000
 
     elif format_ == 112:  # L4A4
         fmtbpp = 1
         has_alpha = 1
         rmask = 0x0000000f
-        gmask = 0x0000000f
-        bmask = 0x0000000f
-        amask = 0x000000f0
+        gmask = 0x000000f0
+        bmask = 0x00000000
+        amask = 0x00000000
 
     flags = 0x00000001 | 0x00001000 | 0x00000004 | 0x00000002
 
@@ -581,7 +590,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     if not compressed:
         flags |= 0x00000008
 
-        if (fmtbpp == 1 and not has_alpha) or format_ == 49:  # LUMINANCE
+        if (fmtbpp == 1 and not has_alpha) or format_ in [49, 112]:  # LUMINANCE
             pflags = 0x00020000
 
         elif fmtbpp == 1 and has_alpha:
@@ -590,7 +599,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         else:  # RGB
             pflags = 0x00000040
 
-        if has_alpha and fmtbpp != 1:
+        if (has_alpha and fmtbpp != 1) or format_ == 112:
             pflags |= 0x00000001
 
         size = w * fmtbpp

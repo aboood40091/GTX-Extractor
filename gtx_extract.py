@@ -125,10 +125,6 @@ class GX2Surface(struct.Struct):
          self.pitch) = self.unpack_from(data, pos)
 
 
-def swapRB(bgra):
-    return bytes((bgra[2], bgra[1], bgra[0], bgra[3]))
-
-
 def readGFD(f):
     gfd = GFDData()
 
@@ -165,17 +161,21 @@ def readGFD(f):
     gfd.alignment = []
     gfd.pitch = []
     gfd.compSel = []
-    gfd.surfOut = []
     gfd.realSize = []
 
     gfd.dataSize = []
     gfd.data = []
+
+    gfd.mipOffsets = []
+    gfd.mipData = {}
 
     while pos < len(f):  # Loop through the entire file, stop if reached the end of the file.
         block = GFDBlockHeader()
         block.data(f, pos)
 
         if block.magic != b'BLK{':
+            print(block.magic)
+            print(pos)
             raise ValueError("Invalid block header!")
 
         pos += block.size
@@ -188,6 +188,13 @@ def readGFD(f):
             surface.data(f, pos)
 
             pos += surface.size
+
+            mipOffsets = []
+            for i in range(13):
+                mipOffsets.append(f[i * 4 + pos] << 24 | f[i * 4 + 1 + pos] << 16 | f[i * 4 + 2 + pos] << 8 | f[i * 4 + 3 + pos])
+
+            gfd.mipOffsets.append(mipOffsets)
+            
             pos += 68
 
             compSel = []
@@ -195,8 +202,6 @@ def readGFD(f):
                 compSel.append(f[pos + i])
 
             pos += 24
-
-            surfOut = addrlib.getSurfaceInfo(surface.format_, surface.width, surface.height, surface.depth, surface.dim, surface.tileMode, surface.aa, 0)
 
             gfd.dim.append(surface.dim)
             gfd.width.append(surface.width)
@@ -213,9 +218,8 @@ def readGFD(f):
             gfd.tileMode.append(surface.tileMode)
             gfd.swizzle.append(surface.swizzle)
             gfd.alignment.append(surface.alignment)
-            gfd.pitch.append(surfOut.pitch)
+            gfd.pitch.append(surface.pitch)
             gfd.compSel.append(compSel)
-            gfd.surfOut.append(surfOut)
             if surface.format_ in BCn_formats:
                 gfd.realSize.append(((surface.width + 3) >> 2) * ((surface.height + 3) >> 2) * (
                     addrlib.surfaceGetBitsPerPixel(surface.format_) // 8))
@@ -229,6 +233,10 @@ def readGFD(f):
 
             gfd.dataSize.append(block.dataSize)
             gfd.data.append(f[pos:pos + block.dataSize])
+            pos += block.dataSize
+
+        elif block.type_ == 0x0D:
+            gfd.mipData[images - 1] = f[pos:pos + block.dataSize]
             pos += block.dataSize
 
         else:
@@ -271,7 +279,30 @@ def readGFD(f):
     return gfd
 
 
-def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, tileMode, swizzle_, pitch, compSel, data, size, surfOut):
+def get_deswizzled_data(i, gfd):
+    numImages = gfd.numImages
+    numMips = gfd.numMips[i]
+    width = gfd.width[i]
+    height = gfd.height[i]
+    depth = gfd.depth[i]
+    dim = gfd.dim[i]
+    format_ = gfd.format[i]
+    aa = gfd.aa[i]
+    tileMode = gfd.tileMode[i]
+    swizzle_ = gfd.swizzle[i]
+    compSel = gfd.compSel[i]
+    data = gfd.data[i]
+    mipSize = gfd.mipSize[i]
+    realSize = gfd.realSize[i]
+    surfOut = addrlib.getSurfaceInfo(format_, width, height, depth, dim, tileMode, aa, 0)
+    bpp = (surfOut.bpp + 7) // 8
+    mipOffsets = gfd.mipOffsets[i]
+
+    try:
+        mipData = gfd.mipData[i]
+    except KeyError:
+        mipData = b''
+
     if format_ in formats:
         if aa != 0:
             print("")
@@ -279,7 +310,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
             if i != (numImages - 1):
                 print("Continuing in 5 seconds...")
                 time.sleep(5)
-                return b'', b''
+                return b'', []
             else:
                 print("Exiting in 5 seconds...")
                 time.sleep(5)
@@ -291,7 +322,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
             if i != (numImages - 1):
                 print("Continuing in 5 seconds...")
                 time.sleep(5)
-                return b'', b''
+                return b'', []
             else:
                 print("Exiting in 5 seconds...")
                 time.sleep(5)
@@ -335,21 +366,48 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
                 if i != (numImages - 1):
                     print("Continuing in 5 seconds...")
                     time.sleep(5)
-                    return b'', b''
+                    return b'', b'', b''
                 else:
                     print("Exiting in 5 seconds...")
                     time.sleep(5)
                     sys.exit(1)
 
-            result = addrlib.deswizzle(width, height, surfOut.height, format_, surfOut.tileMode, swizzle_, pitch, surfOut.bpp, data)
-            result = result[:size]
+            print("")
+            print("Processing " + str(numMips - 1) + " mipmaps:")
 
-            if format_ == 0xa:
-                result = form_conv.toDDSrgb5a1(result)
-            elif format_ == 0xb:
-                result = form_conv.toDDSrgba4(result)
+            result = []
+            for level in range(numMips):
+                if format_ in BCn_formats:
+                    size = ((max(1, width >> level) + 3) >> 2) * ((max(1, height >> level) + 3) >> 2) * bpp
+                else:
+                    size = max(1, width >> level) * max(1, height >> level) * bpp
 
-            hdr = dds.generateHeader(1, width, height, format__, compSel, size, format_ in BCn_formats)
+                if level != 0:
+                    print(str(level) + ": " + str(max(1, width >> level)) + "x" + str(max(1, height >> level)))
+
+                    if level == 1:
+                        mipOffset = mipOffsets[level - 1] - surfOut.surfSize
+                    else:
+                        mipOffset = mipOffsets[level - 1]
+
+                    surfOut = addrlib.getSurfaceInfo(format_, width, height, depth, dim, tileMode, aa, level)
+
+                    data = mipData[mipOffset:mipOffset + surfOut.surfSize]
+
+                deswizzled = addrlib.deswizzle(max(1, width >> level), max(1, height >> level), surfOut.height, format_, surfOut.tileMode, swizzle_, surfOut.pitch, surfOut.bpp, data)
+
+                if format_ == 0xa:
+                    data = form_conv.toDDSrgb5a1(deswizzled[:size])
+
+                elif format_ == 0xb:
+                    data = form_conv.toDDSrgba4(deswizzled[:size])
+
+                else:
+                    data = deswizzled[:size]
+
+                result.append(data)
+
+            hdr = dds.generateHeader(numMips, width, height, format__, compSel, realSize, format_ in BCn_formats)
 
     else:
         print("")
@@ -357,7 +415,7 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
         if i != (numImages - 1):
             print("Continuing in 5 seconds...")
             time.sleep(5)
-            hdr, result = b'', b''
+            hdr, result = b'', []
         else:
             print("Exiting in 5 seconds...")
             time.sleep(5)
@@ -366,16 +424,51 @@ def get_deswizzled_data(i, numImages, width, height, depth, dim, format_, aa, ti
     return hdr, result
 
 
-def writeGFD(f, tileMode, swizzle_, SRGB):
-    width, height, format_, fourcc, dataSize, compSel, data = dds.readDDS(f, SRGB)
+def get_curr_mip_off_size(width, height, bpp, curr_level, compressed):
+    off = 0
+
+    for i in range(curr_level - 1):
+        level = i + 1
+        if compressed:
+            off += ((max(1, width >> level) + 3) >> 2) * ((max(1, height >> level) + 3) >> 2) * bpp
+        else:
+            off += max(1, width >> level) * max(1, height >> level) * bpp
+
+    if compressed:
+        size = ((max(1, width >> curr_level) + 3) >> 2) * ((max(1, height >> curr_level) + 3) >> 2) * bpp
+    else:
+        size = max(1, width >> curr_level) * max(1, height >> curr_level) * bpp
+
+    return off, size
+
+
+def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
+    width, height, format_, fourcc, dataSize, compSel, numMips, data = dds.readDDS(f, SRGB)
+
+    if 0 in [width, dataSize] and data == []:
+        if n != (numImages - 1):
+            print("Continuing in 5 seconds...")
+            time.sleep(5)
+            return b''
+        else:
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+
+    imageData = data[:dataSize]
+    mipData = data[dataSize:]
+    numMips += 1
 
     if format_ in BCn_formats:
         if format_ in [0x31, 0x431, 0x234, 0x34]:
             align = 0xEE4
+            mipAlign = 0xFC0
         else:
             align = 0x1EE4
+            mipAlign = 0x1FC0
     else:
         align = 0x6E4
+        mipAlign = 0x7C0
 
     bpp = addrlib.surfaceGetBitsPerPixel(format_) >> 3
 
@@ -383,15 +476,19 @@ def writeGFD(f, tileMode, swizzle_, SRGB):
 
     surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, 0)
 
-    padSize = surfOut.surfSize - dataSize
-    data += padSize * b"\x00"
+    pitch = surfOut.pitch
 
     if surfOut.depth != 1:
         print("")
         print("Unsupported depth!")
-        print("Exiting in 5 seconds...")
-        time.sleep(5)
-        sys.exit(1)
+        if n != (numImages - 1):
+            print("Continuing in 5 seconds...")
+            time.sleep(5)
+            return b''
+        else:
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
 
     if tileMode in [1, 2, 3, 16]:
         s = 0
@@ -399,6 +496,43 @@ def writeGFD(f, tileMode, swizzle_, SRGB):
         s = 0xd0000
 
     s |= swizzle_ << 8
+
+    if numMips > 1:
+        print("")
+        print("Processing " + str(numMips - 1) + " mipmaps:")
+
+    swizzled_data = []
+    imageSize = 0
+    mipSize = 0
+    mipOffsets = []
+    for i in range(numMips):
+        if i == 0:
+            data = imageData
+
+            imageSize = surfOut.surfSize
+        else:
+            print(str(i) + ": " + str(max(1, width >> i)) + "x" + str(max(1, height >> i)))
+
+            offset, dataSize = get_curr_mip_off_size(width, height, bpp, i, format_ in BCn_formats)
+
+            data = mipData[offset:offset+dataSize]
+
+            surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, i)
+
+        padSize = surfOut.surfSize - dataSize
+        data += padSize * b"\x00"
+
+        if i != 0:
+            offset += padSize
+
+            if i == 1:
+                mipOffsets.append(imageSize)
+            else:
+                mipOffsets.append(offset)
+
+            mipSize += len(data)
+
+        swizzled_data.append(addrlib.swizzle(max(1, width >> i), max(1, width >> i), surfOut.height, format_, surfOut.tileMode, s, surfOut.pitch, surfOut.bpp, data))
 
     compSels = ["Red", "Green", "Blue", "Alpha", "0", "1"]
 
@@ -408,16 +542,16 @@ def writeGFD(f, tileMode, swizzle_, SRGB):
     print("  width           = " + str(width))
     print("  height          = " + str(height))
     print("  depth           = 1")
-    print("  numMips         = 1")
+    print("  numMips         = " + str(numMips))
     print("  format          = " + formats[format_])
     print("  aa              = 0")
     print("  use             = 1")
-    print("  imageSize       = " + str(len(data)))
-    print("  mipSize         = 0")
+    print("  imageSize       = " + str(imageSize))
+    print("  mipSize         = " + str(mipSize))
     print("  tileMode        = " + str(tileMode))
     print("  swizzle         = " + str(s) + ", " + hex(s))
     print("  alignment       = " + str(alignment))
-    print("  pitch           = " + str(surfOut.pitch))
+    print("  pitch           = " + str(pitch))
     print("")
     print("  GX2 Component Selector:")
     print("    Channel 1:      " + str(compSels[compSel[0]]))
@@ -427,28 +561,35 @@ def writeGFD(f, tileMode, swizzle_, SRGB):
     print("")
     print("  bits per pixel  = " + str(bpp << 3))
     print("  bytes per pixel = " + str(bpp))
-    print("  realSize        = " + str(dataSize))
-
-    swizzled_data = addrlib.swizzle(width, height, surfOut.height, format_, surfOut.tileMode, s, surfOut.pitch, surfOut.bpp, data)
-
-    head_struct = GFDHeader()
-    head = head_struct.pack(b"Gfx2", 32, 7, 1, 2, 1, 0, 0)
+    print("  realSize        = " + str(len(imageData)))
 
     block_head_struct = GFDBlockHeader()
     gx2surf_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xb, 0x9c, 0, 0)
 
     gx2surf_struct = GX2Surface()
-    gx2surf = gx2surf_struct.pack(1, width, height, 1, 1, format_, 0, 1, len(swizzled_data), 0, 0, 0, tileMode, s, alignment, surfOut.pitch)
+    gx2surf = gx2surf_struct.pack(1, width, height, 1, numMips, format_, 0, 1, imageSize, 0, mipSize, 0, tileMode, s, alignment, pitch)
 
     align_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, align, 0, 0)
 
-    image_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xc, len(swizzled_data), 0, 0)
+    image_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xc, imageSize, 0, 0)
 
-    eof_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 1, 0, 0, 0)
+    mipAlign_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, mipAlign, 0, 0)
 
-    output = head + gx2surf_blk_head + gx2surf
-    output += b"\x00" * 56
-    output += 1 .to_bytes(4, 'big')
+    mip_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xd, mipSize, 0, 0)
+
+    output = gx2surf_blk_head + gx2surf
+
+    if numMips > 1:
+        i = 0
+        for offset in mipOffsets:
+            output += offset.to_bytes(4, 'big')
+            i += 1
+        for z in range(14 - i):
+            output += 0 .to_bytes(4, 'big')
+    else:
+        output += b"\x00" * 56
+
+    output += numMips.to_bytes(4, 'big')
     output += b"\x00" * 4
     output += 1 .to_bytes(4, 'big')
 
@@ -459,8 +600,17 @@ def writeGFD(f, tileMode, swizzle_, SRGB):
     output += align_blk_head
     output += b"\x00" * align
     output += image_blk_head
-    output += swizzled_data
-    output += eof_blk_head
+    output += swizzled_data[0]
+
+    if numMips > 1:
+        output += mipAlign_blk_head
+        output += b"\x00" * mipAlign
+        output += mip_blk_head
+        i = 0
+        for data in swizzled_data:
+            if i != 0:
+                output += data
+            i += 1
 
     return output
 
@@ -478,6 +628,7 @@ def printInfo():
     print(" -tileMode <tileMode>  tileMode (4 is the default)")
     print(" -swizzle <swizzle>    the intial swizzle value, a value from 0 to 7 (0 is the default)")
     print(" -SRGB <n>             1 if the desired destination format is SRGB, else 0 (0 is the default)")
+    print(" -multi <numImages>    number of images to pack into the GTX file (input file must be the first image, 1 is the default)")
     print("")
     print("Supported formats:")
     print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM")
@@ -543,13 +694,36 @@ def main():
         else:
             SRGB = 0
 
+        multi = False
+        if "-multi" in sys.argv:
+            multi = True
+            numImages = int(sys.argv[sys.argv.index("-multi") + 1], 0)
+
         if SRGB > 1 or not 0 <= tileMode <= 16 or not 0 <= swizzle <= 7:
             printInfo()
 
-        data = writeGFD(input_, tileMode, swizzle, SRGB)
+        if "-o" not in sys.argv:
+            output_ = output_[:-5] + ".gtx"
 
         with open(output_, "wb+") as output:
-            output.write(data)
+            head_struct = GFDHeader()
+            head = head_struct.pack(b"Gfx2", 32, 7, 1, 2, 1, 0, 0)
+
+            output.write(head)
+
+            if multi:
+                input_ = input_[:-5]
+                for i in range(numImages):
+                    data = writeGFD(input_ + str(i) + ".dds", tileMode, swizzle, SRGB, i, numImages)
+                    output.write(data)
+            else:
+                data = writeGFD(input_, tileMode, swizzle, SRGB, 0, 1)
+                output.write(data)
+
+            block_head_struct = GFDBlockHeader()
+            eof_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 1, 0, 0, 0)
+
+            output.write(eof_blk_head)
 
     else:
         with open(input_, "rb") as inf:
@@ -595,16 +769,15 @@ def main():
             if gfd.numImages > 1:
                 output_  = os.path.splitext(input_)[0] + str(i) + ".dds"
 
-            hdr, data = get_deswizzled_data(i, gfd.numImages, gfd.width[i], gfd.height[i], gfd.depth[i], gfd.dim[i],
-                                            gfd.format[i],gfd.aa[i], gfd.tileMode[i], gfd.swizzle[i], gfd.pitch[i],
-                                            gfd.compSel[i], gfd.data[i], gfd.realSize[i], gfd.surfOut[i])
+            hdr, result = get_deswizzled_data(i, gfd)
 
-            if data == b'':
+            if hdr == b'' or result == []:
                 pass
             else:
                 with open(output_, "wb+") as output:
                     output.write(hdr)
-                    output.write(data)
+                    for data in result:
+                        output.write(data)
 
     print('')
     print('Finished converting: ' + input_)

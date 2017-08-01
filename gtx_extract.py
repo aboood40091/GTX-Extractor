@@ -189,6 +189,14 @@ def readGFD(f):
 
             pos += surface.size
 
+            if surface.numMips > 14:
+                print("")
+                print("Invalid number of mipmaps for image " + str(imgInfo - 1))
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
+
             mipOffsets = []
             for i in range(13):
                 mipOffsets.append(f[i * 4 + pos] << 24 | f[i * 4 + 1 + pos] << 16 | f[i * 4 + 2 + pos] << 8 | f[i * 4 + 3 + pos])
@@ -307,6 +315,7 @@ def get_deswizzled_data(i, gfd):
         if aa != 0:
             print("")
             print("Unsupported aa!")
+            print("")
             if i != (numImages - 1):
                 print("Continuing in 5 seconds...")
                 time.sleep(5)
@@ -319,6 +328,7 @@ def get_deswizzled_data(i, gfd):
         if format_ == 0x00:
             print("")
             print("Invalid texture format!")
+            print("")
             if i != (numImages - 1):
                 print("Continuing in 5 seconds...")
                 time.sleep(5)
@@ -363,6 +373,7 @@ def get_deswizzled_data(i, gfd):
             if surfOut.depth != 1:
                 print("")
                 print("Unsupported depth!")
+                print("")
                 if i != (numImages - 1):
                     print("Continuing in 5 seconds...")
                     time.sleep(5)
@@ -412,6 +423,7 @@ def get_deswizzled_data(i, gfd):
     else:
         print("")
         print("Unsupported texture format_: " + hex(format_))
+        print("")
         if i != (numImages - 1):
             print("Continuing in 5 seconds...")
             time.sleep(5)
@@ -446,7 +458,22 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
     width, height, format_, fourcc, dataSize, compSel, numMips, data = dds.readDDS(f, SRGB)
 
     if 0 in [width, dataSize] and data == []:
+        print("")
         if n != (numImages - 1):
+            print("Continuing in 5 seconds...")
+            time.sleep(5)
+            return b''
+        else:
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+
+    if numMips > 13:
+        print("")
+        print("Invalid number of mipmaps for " + f)
+        print("")
+        if n != (numImages - 1):
+            print("")
             print("Continuing in 5 seconds...")
             time.sleep(5)
             return b''
@@ -481,6 +508,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
     if surfOut.depth != 1:
         print("")
         print("Unsupported depth!")
+        print("")
         if n != (numImages - 1):
             print("Continuing in 5 seconds...")
             time.sleep(5)

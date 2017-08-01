@@ -64,23 +64,15 @@ def readDDS(f, SRGB):
         print("Invalid texture.")
         return 0, 0, 0, b'', 0, [], 0, []
 
-    abgr8_masks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0xff000000: 3, 0: 4}
-    abgr8_amasks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0xff000000: 3, 0: 5}
-    bgr8_masks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0: 4}
-    a2rgb10_masks = {0x3ff00000: 0, 0xffc00: 1, 0x3ff: 2, 0xc0000000: 3, 0: 4}
-    a2rgb10_amasks = {0x3ff00000: 0, 0xffc00: 1, 0x3ff: 2, 0xc0000000: 3, 0: 5}
-    rgb565_masks = {0xf800: 0, 0x7e0: 1, 0x1f: 2, 0: 4}
-    rgb565_amasks = {0xf800: 0, 0x7e0: 1, 0x1f: 2, 0: 5}
-    a1rgb5_masks = {0x7c00: 0, 0x3e0: 1, 0x1f: 2, 0x8000: 3, 0: 4}
-    a1rgb5_amasks = {0x7c00: 0, 0x3e0: 1, 0x1f: 2, 0x8000: 3, 0: 5}
-    argb4_masks = {0xf00: 0, 0xf0: 1, 0xf: 2, 0xf000: 3, 0: 4}
-    argb4_amasks = {0xf00: 0, 0xf0: 1, 0xf: 2, 0xf000: 3, 0: 5}
-    l8_masks = {0xff: 0, 0: 4}
-    l8_amasks = {0xff: 0, 0: 5}
-    a8l8_masks = {0xff: 0, 0xff00: 1, 0: 4}
-    a8l8_amasks = {0xff: 0, 0xff00: 1, 0: 5}
-    a4l4_masks = {0xf: 0, 0xf0: 1, 0: 4}
-    a4l4_amasks = {0xf: 0, 0xf0: 1, 0: 5}
+    abgr8_masks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0xff000000: 3, 0: 5}
+    bgr8_masks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0: 5}
+    a2rgb10_masks = {0x3ff00000: 0, 0xffc00: 1, 0x3ff: 2, 0xc0000000: 3, 0: 5}
+    rgb565_masks = {0xf800: 0, 0x7e0: 1, 0x1f: 2, 0: 5}
+    a1rgb5_masks = {0x7c00: 0, 0x3e0: 1, 0x1f: 2, 0x8000: 3, 0: 5}
+    argb4_masks = {0xf00: 0, 0xf0: 1, 0xf: 2, 0xf000: 3, 0: 5}
+    l8_masks = {0xff: 0, 0: 5}
+    a8l8_masks = {0xff: 0, 0xff00: 1, 0: 5}
+    a4l4_masks = {0xf: 0, 0xf0: 1, 0: 5}
 
     compressed = False
     luminance = False
@@ -154,19 +146,19 @@ def readDDS(f, SRGB):
                 if channel0 in a8l8_masks and channel1 in a8l8_masks and channel2 in a8l8_masks and channel3 in a8l8_masks and bpp == 2:
                     format_ = 7
 
-                    compSel = [a8l8_masks[channel0], a8l8_masks[channel1], a8l8_masks[channel2], a8l8_amasks[channel3]]
+                    compSel = [a8l8_masks[channel0], a8l8_masks[channel1], a8l8_masks[channel2], a8l8_masks[channel3]]
                         
 
                 elif channel0 in a4l4_masks and channel1 in a4l4_masks and channel2 in a4l4_masks and channel3 in a4l4_masks and bpp == 1:
                     format_ = 2
 
-                    compSel = [a4l4_masks[channel0], a4l4_masks[channel1], a4l4_masks[channel2], a4l4_amasks[channel3]]
+                    compSel = [a4l4_masks[channel0], a4l4_masks[channel1], a4l4_masks[channel2], a4l4_masks[channel3]]
 
             else:
                 if channel0 in l8_masks and channel1 in l8_masks and channel2 in l8_masks and channel3 in l8_masks and bpp == 1:
                     format_ = 1
 
-                    compSel = [l8_masks[channel0], l8_masks[channel1], l8_masks[channel2], l8_amasks[channel3]]
+                    compSel = [l8_masks[channel0], l8_masks[channel1], l8_masks[channel2], l8_masks[channel3]]
 
         elif rgb:
             if has_alpha:
@@ -174,23 +166,23 @@ def readDDS(f, SRGB):
                     if channel0 in abgr8_masks and channel1 in abgr8_masks and channel2 in abgr8_masks and channel3 in abgr8_masks:
                         format_ = 0x41a if SRGB else 0x1a
 
-                        compSel = [abgr8_masks[channel0], abgr8_masks[channel1], abgr8_masks[channel2], abgr8_amasks[channel3]]
+                        compSel = [abgr8_masks[channel0], abgr8_masks[channel1], abgr8_masks[channel2], abgr8_masks[channel3]]
 
                     elif channel0 in a2rgb10_masks and channel1 in a2rgb10_masks and channel2 in a2rgb10_masks and channel3 in a2rgb10_masks:
                         format_ = 0x19
 
-                        compSel = [a2rgb10_masks[channel0], a2rgb10_masks[channel1], a2rgb10_masks[channel2], a2rgb10_amasks[channel3]]
+                        compSel = [a2rgb10_masks[channel0], a2rgb10_masks[channel1], a2rgb10_masks[channel2], a2rgb10_masks[channel3]]
 
                 elif bpp == 2:
                     if channel0 in a1rgb5_masks and channel1 in a1rgb5_masks and channel2 in a1rgb5_masks and channel3 in a1rgb5_masks:
                         format_ = 0xa
 
-                        compSel = [a1rgb5_masks[channel0], a1rgb5_masks[channel1], a1rgb5_masks[channel2], a1rgb5_amasks[channel3]]
+                        compSel = [a1rgb5_masks[channel0], a1rgb5_masks[channel1], a1rgb5_masks[channel2], a1rgb5_masks[channel3]]
 
                     elif channel0 in argb4_masks and channel1 in argb4_masks and channel2 in argb4_masks and channel3 in argb4_masks:
                         format_ = 0xb
 
-                        compSel = [argb4_masks[channel0], argb4_masks[channel1], argb4_masks[channel2], argb4_amasks[channel3]]
+                        compSel = [argb4_masks[channel0], argb4_masks[channel1], argb4_masks[channel2], argb4_masks[channel3]]
 
             else:
                 if channel0 in bgr8_masks and channel1 in bgr8_masks and channel2 in bgr8_masks and channel3 == 0 and bpp == 3: # Kinda not looking good if you ask me
@@ -201,7 +193,7 @@ def readDDS(f, SRGB):
                 if channel0 in rgb565_masks and channel1 in rgb565_masks and channel2 in rgb565_masks and channel3 in rgb565_masks and bpp == 2:
                     format_ = 8
 
-                    compSel = [rgb565_masks[channel0], rgb565_masks[channel1], rgb565_masks[channel2], rgb565_amasks[channel3]]
+                    compSel = [rgb565_masks[channel0], rgb565_masks[channel1], rgb565_masks[channel2], rgb565_masks[channel3]]
 
         size = width * height * bpp
 
@@ -258,46 +250,46 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
 
     if format_ == 28:  # ABGR8
         RGB = True
-        compSels = {0: 0x000000ff, 1: 0x0000ff00, 2: 0x00ff0000, 3: 0xff000000, 4: 0, 5: 0}
+        compSels = {0: 0x000000ff, 1: 0x0000ff00, 2: 0x00ff0000, 3: 0xff000000, 5: 0}
         fmtbpp = 4
         
 
     elif format_ == 24:  # A2RGB10
         RGB = True
-        compSels = {0: 0x3ff00000, 1: 0x000ffc00, 2: 0x000003ff, 3: 0xc0000000, 4: 0, 5: 0}
+        compSels = {0: 0x3ff00000, 1: 0x000ffc00, 2: 0x000003ff, 3: 0xc0000000, 5: 0}
         fmtbpp = 4
 
     elif format_ == 85:  # RGB565
         RGB = True
-        compSels = {0: 0x0000f800, 1: 0x000007e0, 2: 0x0000001f, 3: 0, 4: 0, 5: 0}
+        compSels = {0: 0x0000f800, 1: 0x000007e0, 2: 0x0000001f, 3: 0, 5: 0}
         fmtbpp = 2
         has_alpha = False
 
     elif format_ == 86:  # A1RGB5
         RGB = True
-        compSels = {0: 0x00007c00, 1: 0x000003e0, 2: 0x0000001f, 3: 0x00008000, 4: 0, 5: 0}
+        compSels = {0: 0x00007c00, 1: 0x000003e0, 2: 0x0000001f, 3: 0x00008000, 5: 0}
         fmtbpp = 2
 
     elif format_ == 115:  # ARGB4
         RGB = True
-        compSels = {0: 0x00000f00, 1: 0x000000f0, 2: 0x0000000f, 3: 0x0000f000, 4: 0, 5: 0}
+        compSels = {0: 0x00000f00, 1: 0x000000f0, 2: 0x0000000f, 3: 0x0000f000, 5: 0}
         fmtbpp = 2
 
     elif format_ == 61:  # L8
         luminance = True
-        compSels = {0: 0x000000ff, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        compSels = {0: 0x000000ff, 1: 0, 2: 0, 3: 0, 5: 0}
         fmtbpp = 1
         if compSel[3] != 0:
             has_alpha = False
 
     elif format_ == 49:  # A8L8
         luminance = True
-        compSels = {0: 0x000000ff, 1: 0x0000ff00, 2: 0, 3: 0, 4: 0, 5: 0}
+        compSels = {0: 0x000000ff, 1: 0x0000ff00, 2: 0, 3: 0, 5: 0}
         fmtbpp = 2
 
     elif format_ == 112:  # A4L4
         luminance = True
-        compSels = {0: 0x0000000f, 1: 0x000000f0, 2: 0, 3: 0, 4: 0, 5: 0}
+        compSels = {0: 0x0000000f, 1: 0x000000f0, 2: 0, 3: 0, 5: 0}
         fmtbpp = 1
 
     flags = 0x00000001 | 0x00001000 | 0x00000004 | 0x00000002

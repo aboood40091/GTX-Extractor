@@ -207,6 +207,9 @@ def readGFD(f):
 
             compSel = []
             for i in range(4):
+                comp = f[pos + i]
+                if comp == 4: # Sorry, but this is unsupported.
+                    comp = i
                 compSel.append(f[pos + i])
 
             pos += 24

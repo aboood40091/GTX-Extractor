@@ -64,15 +64,23 @@ def readDDS(f, SRGB):
         print("Invalid texture.")
         return 0, 0, 0, b'', 0, [], 0, []
 
-    rgba8_masks = [0xff, 0xff00, 0xff0000, 0xff000000, 0]
-    rgb8_masks = [0xff, 0xff00, 0xff0000, 0]
-    rgb10a2_masks = [0x3ff, 0xffc00, 0x3ff00000, 0xc0000000]
-    rgb565_masks = [0xf800, 0x7e0, 0x1f, 0]
-    rgb5a1_masks = [0x7c00, 0x3e0, 0x1f, 0x8000]
-    rgba4_masks = [0xf00, 0xf0, 0xf, 0xf000]
-    l8_masks = [0xff, 0]
-    l8a8_masks = [0xff, 0xff00]
-    l4a4_masks = [0xf, 0xf0]
+    abgr8_masks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0xff000000: 3, 0: 4}
+    abgr8_amasks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0xff000000: 3, 0: 5}
+    bgr8_masks = {0xff: 0, 0xff00: 1, 0xff0000: 2, 0: 4}
+    a2rgb10_masks = {0x3ff00000: 0, 0xffc00: 1, 0x3ff: 2, 0xc0000000: 3, 0: 4}
+    a2rgb10_amasks = {0x3ff00000: 0, 0xffc00: 1, 0x3ff: 2, 0xc0000000: 3, 0: 5}
+    rgb565_masks = {0xf800: 0, 0x7e0: 1, 0x1f: 2, 0: 4}
+    rgb565_amasks = {0xf800: 0, 0x7e0: 1, 0x1f: 2, 0: 5}
+    a1rgb5_masks = {0x7c00: 0, 0x3e0: 1, 0x1f: 2, 0x8000: 3, 0: 4}
+    a1rgb5_amasks = {0x7c00: 0, 0x3e0: 1, 0x1f: 2, 0x8000: 3, 0: 5}
+    argb4_masks = {0xf00: 0, 0xf0: 1, 0xf: 2, 0xf000: 3, 0: 4}
+    argb4_amasks = {0xf00: 0, 0xf0: 1, 0xf: 2, 0xf000: 3, 0: 5}
+    l8_masks = {0xff: 0, 0: 4}
+    l8_amasks = {0xff: 0, 0: 5}
+    a8l8_masks = {0xff: 0, 0xff00: 1, 0: 4}
+    a8l8_amasks = {0xff: 0, 0xff00: 1, 0: 5}
+    a4l4_masks = {0xf: 0, 0xf0: 1, 0: 4}
+    a4l4_amasks = {0xf: 0, 0xf0: 1, 0: 5}
 
     compressed = False
     luminance = False
@@ -141,326 +149,59 @@ def readDDS(f, SRGB):
         size = ((width + 3) >> 2) * ((height + 3) >> 2) * bpp
 
     else:
-        compSel = []
-
         if luminance:
             if has_alpha:
-                if channel0 in l8a8_masks and channel1 in l8a8_masks and channel2 in l8a8_masks and channel3 in l8a8_masks and bpp == 2:
+                if channel0 in a8l8_masks and channel1 in a8l8_masks and channel2 in a8l8_masks and channel3 in a8l8_masks and bpp == 2:
                     format_ = 7
 
-                    if channel0 == 0xff:
-                        compSel.append(0)
-                    elif channel0 == 0xff00:
-                        compSel.append(1)
-
-                    if channel1 == 0xff:
-                        compSel.append(0)
-                    elif channel1 == 0xff00:
-                        compSel.append(1)
-
-                    if channel2 == 0xff:
-                        compSel.append(0)
-                    elif channel2 == 0xff00:
-                        compSel.append(1)
-
-                    if channel3 == 0xff:
-                        compSel.append(0)
-                    elif channel3 == 0xff00:
-                        compSel.append(1)
+                    compSel = [a8l8_masks[channel0], a8l8_masks[channel1], a8l8_masks[channel2], a8l8_amasks[channel3]]
                         
 
-                elif channel0 in l4a4_masks and channel1 in l4a4_masks and channel2 in l4a4_masks and channel3 in l4a4_masks and bpp == 1:
+                elif channel0 in a4l4_masks and channel1 in a4l4_masks and channel2 in a4l4_masks and channel3 in a4l4_masks and bpp == 1:
                     format_ = 2
 
-                    if channel0 == 0xf:
-                        compSel.append(0)
-                    elif channel0 == 0xf0:
-                        compSel.append(1)
-
-                    if channel1 == 0xf:
-                        compSel.append(0)
-                    elif channel1 == 0xf0:
-                        compSel.append(1)
-
-                    if channel2 == 0xf:
-                        compSel.append(0)
-                    elif channel2 == 0xf0:
-                        compSel.append(1)
-
-                    if channel3 == 0xf:
-                        compSel.append(0)
-                    elif channel3 == 0xf0:
-                        compSel.append(1)
+                    compSel = [a4l4_masks[channel0], a4l4_masks[channel1], a4l4_masks[channel2], a4l4_amasks[channel3]]
 
             else:
                 if channel0 in l8_masks and channel1 in l8_masks and channel2 in l8_masks and channel3 in l8_masks and bpp == 1:
                     format_ = 1
 
-                    if channel0 == 0xff:
-                        compSel.append(3 if pflags == 2 else 0)
-                    elif channel0 == 0:
-                        compSel.append(4)
+                    compSel = [l8_masks[channel0], l8_masks[channel1], l8_masks[channel2], l8_amasks[channel3]]
 
-                    if channel1 == 0xff:
-                        compSel.append(3 if pflags == 2 else 0)
-                    elif channel1 == 0:
-                        compSel.append(4)
-
-                    if channel2 == 0xff:
-                        compSel.append(3 if pflags == 2 else 0)
-                    elif channel2 == 0:
-                        compSel.append(4)
-
-                    if channel3 == 0xff:
-                        compSel.append(3 if pflags == 2 else 0)
-                    elif channel3 == 0:
-                        compSel.append(4)
         elif rgb:
             if has_alpha:
                 if bpp == 4:
-                    if channel0 in rgba8_masks and channel1 in rgba8_masks and channel2 in rgba8_masks and channel3 in rgba8_masks:
+                    if channel0 in abgr8_masks and channel1 in abgr8_masks and channel2 in abgr8_masks and channel3 in abgr8_masks:
                         format_ = 0x41a if SRGB else 0x1a
 
-                        if channel0 == 0xff:
-                            compSel.append(0)
-                        elif channel0 == 0xff00:
-                            compSel.append(1)
-                        elif channel0 == 0xff0000:
-                            compSel.append(2)
-                        elif channel0 == 0xff000000:
-                            compSel.append(3)
-                        elif channel0 == 0:
-                            compSel.append(4)
+                        compSel = [abgr8_masks[channel0], abgr8_masks[channel1], abgr8_masks[channel2], abgr8_amasks[channel3]]
 
-                        if channel1 == 0xff:
-                            compSel.append(0)
-                        elif channel1 == 0xff00:
-                            compSel.append(1)
-                        elif channel1 == 0xff0000:
-                            compSel.append(2)
-                        elif channel1 == 0xff000000:
-                            compSel.append(3)
-                        elif channel1 == 0:
-                            compSel.append(4)
-
-                        if channel2 == 0xff:
-                            compSel.append(0)
-                        elif channel2 == 0xff00:
-                            compSel.append(1)
-                        elif channel2 == 0xff0000:
-                            compSel.append(2)
-                        elif channel2 == 0xff000000:
-                            compSel.append(3)
-                        elif channel2 == 0:
-                            compSel.append(4)
-
-                        if channel3 == 0xff:
-                            compSel.append(0)
-                        elif channel3 == 0xff00:
-                            compSel.append(1)
-                        elif channel3 == 0xff0000:
-                            compSel.append(2)
-                        elif channel3 == 0xff000000:
-                            compSel.append(3)
-                        elif channel3 == 0:
-                            compSel.append(5)
-
-                    elif channel0 in rgb10a2_masks and channel1 in rgb10a2_masks and channel2 in rgb10a2_masks and channel3 in rgb10a2_masks:
+                    elif channel0 in a2rgb10_masks and channel1 in a2rgb10_masks and channel2 in a2rgb10_masks and channel3 in a2rgb10_masks:
                         format_ = 0x19
 
-                        if channel0 == 0x3ff:
-                            compSel.append(0)
-                        elif channel0 == 0xffc00:
-                            compSel.append(1)
-                        elif channel0 == 0x3ff00000:
-                            compSel.append(2)
-                        elif channel0 == 0xc0000000:
-                            compSel.append(3)
-
-                        if channel1 == 0x3ff:
-                            compSel.append(0)
-                        elif channel1 == 0xffc00:
-                            compSel.append(1)
-                        elif channel1 == 0x3ff00000:
-                            compSel.append(2)
-                        elif channel1 == 0xc0000000:
-                            compSel.append(3)
-
-                        if channel2 == 0x3ff:
-                            compSel.append(0)
-                        elif channel2 == 0xffc00:
-                            compSel.append(1)
-                        elif channel2 == 0x3ff00000:
-                            compSel.append(2)
-                        elif channel2 == 0xc0000000:
-                            compSel.append(3)
-
-                        if channel3 == 0x3ff:
-                            compSel.append(0)
-                        elif channel3 == 0xffc00:
-                            compSel.append(1)
-                        elif channel3 == 0x3ff00000:
-                            compSel.append(2)
-                        elif channel3 == 0xc0000000:
-                            compSel.append(3)
+                        compSel = [a2rgb10_masks[channel0], a2rgb10_masks[channel1], a2rgb10_masks[channel2], a2rgb10_amasks[channel3]]
 
                 elif bpp == 2:
-                    if channel0 in rgb5a1_masks and channel1 in rgb5a1_masks and channel2 in rgb5a1_masks and channel3 in rgb5a1_masks:
+                    if channel0 in a1rgb5_masks and channel1 in a1rgb5_masks and channel2 in a1rgb5_masks and channel3 in a1rgb5_masks:
                         format_ = 0xa
 
-                        if channel0 == 0x1f:
-                            compSel.append(2)
-                        elif channel0 == 0x3e0:
-                            compSel.append(1)
-                        elif channel0 == 0x7c00:
-                            compSel.append(0)
-                        elif channel0 == 0x8000:
-                            compSel.append(3)
+                        compSel = [a1rgb5_masks[channel0], a1rgb5_masks[channel1], a1rgb5_masks[channel2], a1rgb5_amasks[channel3]]
 
-                        if channel1 == 0x1f:
-                            compSel.append(2)
-                        elif channel1 == 0x3e0:
-                            compSel.append(1)
-                        elif channel1 == 0x7c00:
-                            compSel.append(0)
-                        elif channel1 == 0x8000:
-                            compSel.append(3)
-
-                        if channel2 == 0x1f:
-                            compSel.append(2)
-                        elif channel2 == 0x3e0:
-                            compSel.append(1)
-                        elif channel2 == 0x7c00:
-                            compSel.append(0)
-                        elif channel2 == 0x8000:
-                            compSel.append(3)
-
-                        if channel3 == 0x1f:
-                            compSel.append(2)
-                        elif channel3 == 0x3e0:
-                            compSel.append(1)
-                        elif channel3 == 0x7c00:
-                            compSel.append(0)
-                        elif channel3 == 0x8000:
-                            compSel.append(3)
-
-                    elif channel0 in rgba4_masks and channel1 in rgba4_masks and channel2 in rgba4_masks and channel3 in rgba4_masks:
+                    elif channel0 in argb4_masks and channel1 in argb4_masks and channel2 in argb4_masks and channel3 in argb4_masks:
                         format_ = 0xb
 
-                        if channel0 == 0xf:
-                            compSel.append(2)
-                        elif channel0 == 0xf0:
-                            compSel.append(1)
-                        elif channel0 == 0xf00:
-                            compSel.append(0)
-                        elif channel0 == 0xf000:
-                            compSel.append(3)
-
-                        if channel1 == 0xf:
-                            compSel.append(2)
-                        elif channel1 == 0xf0:
-                            compSel.append(1)
-                        elif channel1 == 0xf00:
-                            compSel.append(0)
-                        elif channel1 == 0xf000:
-                            compSel.append(3)
-
-                        if channel2 == 0xf:
-                            compSel.append(2)
-                        elif channel2 == 0xf0:
-                            compSel.append(1)
-                        elif channel2 == 0xf00:
-                            compSel.append(0)
-                        elif channel2 == 0xf000:
-                            compSel.append(3)
-
-                        if channel3 == 0xf:
-                            compSel.append(2)
-                        elif channel3 == 0xf0:
-                            compSel.append(1)
-                        elif channel3 == 0xf00:
-                            compSel.append(0)
-                        elif channel3 == 0xf000:
-                            compSel.append(3)
+                        compSel = [argb4_masks[channel0], argb4_masks[channel1], argb4_masks[channel2], argb4_amasks[channel3]]
 
             else:
-                if channel0 in rgb8_masks and channel1 in rgb8_masks and channel2 in rgb8_masks and channel3 in rgb8_masks and bpp == 3:
+                if channel0 in bgr8_masks and channel1 in bgr8_masks and channel2 in bgr8_masks and channel3 == 0 and bpp == 3: # Kinda not looking good if you ask me
                     format_ = 0x41a if SRGB else 0x1a
 
-                    if channel0 == 0xff:
-                        compSel.append(0)
-                    elif channel0 == 0xff00:
-                        compSel.append(1)
-                    elif channel0 == 0xff0000:
-                        compSel.append(2)
-                    elif channel0 == 0:
-                        compSel.append(4)
-
-                    if channel1 == 0xff:
-                        compSel.append(0)
-                    elif channel1 == 0xff00:
-                        compSel.append(1)
-                    elif channel1 == 0xff0000:
-                        compSel.append(2)
-                    elif channel1 == 0:
-                        compSel.append(4)
-
-                    if channel2 == 0xff:
-                        compSel.append(0)
-                    elif channel2 == 0xff00:
-                        compSel.append(1)
-                    elif channel2 == 0xff0000:
-                        compSel.append(2)
-                    elif channel2 == 0:
-                        compSel.append(4)
-
-                    if channel3 == 0xff:
-                        compSel.append(0)
-                    elif channel3 == 0xff00:
-                        compSel.append(1)
-                    elif channel3 == 0xff0000:
-                        compSel.append(2)
-                    elif channel3 == 0:
-                        compSel.append(5)
+                    compSel = [bgr8_masks[channel0], bgr8_masks[channel1], bgr8_masks[channel2], 3]
 
                 if channel0 in rgb565_masks and channel1 in rgb565_masks and channel2 in rgb565_masks and channel3 in rgb565_masks and bpp == 2:
                     format_ = 8
 
-                    if channel0 == 0x1f:
-                        compSel.append(2)
-                    elif channel0 == 0x7e0:
-                        compSel.append(1)
-                    elif channel0 == 0xf800:
-                        compSel.append(0)
-                    elif channel0 == 0:
-                        compSel.append(4)
-
-                    if channel1 == 0x1f:
-                        compSel.append(2)
-                    elif channel1 == 0x7e0:
-                        compSel.append(1)
-                    elif channel1 == 0xf800:
-                        compSel.append(0)
-                    elif channel1 == 0:
-                        compSel.append(4)
-
-                    if channel2 == 0x1f:
-                        compSel.append(2)
-                    elif channel2 == 0x7e0:
-                        compSel.append(1)
-                    elif channel2 == 0xf800:
-                        compSel.append(0)
-                    elif channel2 == 0:
-                        compSel.append(4)
-
-                    if channel3 == 0x1f:
-                        compSel.append(2)
-                    elif channel3 == 0x7e0:
-                        compSel.append(1)
-                    elif channel3 == 0xf800:
-                        compSel.append(0)
-                    elif channel3 == 0:
-                        compSel.append(4)
+                    compSel = [rgb565_masks[channel0], rgb565_masks[channel1], rgb565_masks[channel2], rgb565_amasks[channel3]]
 
         size = width * height * bpp
 
@@ -510,72 +251,54 @@ def get_mipSize(width, height, bpp, numMips, compressed):
 def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     hdr = bytearray(128)
 
-    if format_ == 28:  # RGBA8
-        fmtbpp = 4
-        has_alpha = 1
-        rmask = 0x000000ff
-        gmask = 0x0000ff00
-        bmask = 0x00ff0000
-        amask = 0xff000000
+    luminance = False
+    RGB = False
 
-    elif format_ == 24:  # RGB10A2
+    has_alpha = True
+
+    if format_ == 28:  # ABGR8
+        RGB = True
+        compSels = {0: 0x000000ff, 1: 0x0000ff00, 2: 0x00ff0000, 3: 0xff000000, 4: 0, 5: 0}
         fmtbpp = 4
-        has_alpha = 1
-        rmask = 0x000003ff
-        gmask = 0x000ffc00
-        bmask = 0x3ff00000
-        amask = 0xc0000000
+        
+
+    elif format_ == 24:  # A2RGB10
+        RGB = True
+        compSels = {0: 0x3ff00000, 1: 0x000ffc00, 2: 0x000003ff, 3: 0xc0000000, 4: 0, 5: 0}
+        fmtbpp = 4
 
     elif format_ == 85:  # RGB565
+        RGB = True
+        compSels = {0: 0x0000f800, 1: 0x000007e0, 2: 0x0000001f, 3: 0, 4: 0, 5: 0}
         fmtbpp = 2
-        has_alpha = 0
-        rmask = 0x0000f800
-        gmask = 0x000007e0
-        bmask = 0x0000001f
-        amask = 0x00000000
+        has_alpha = False
 
-    elif format_ == 86:  # RGB5A1
+    elif format_ == 86:  # A1RGB5
+        RGB = True
+        compSels = {0: 0x00007c00, 1: 0x000003e0, 2: 0x0000001f, 3: 0x00008000, 4: 0, 5: 0}
         fmtbpp = 2
-        has_alpha = 1
-        rmask = 0x00007c00
-        gmask = 0x000003e0
-        bmask = 0x0000001f
-        amask = 0x00008000
 
-    elif format_ == 115:  # RGBA4
+    elif format_ == 115:  # ARGB4
+        RGB = True
+        compSels = {0: 0x00000f00, 1: 0x000000f0, 2: 0x0000000f, 3: 0x0000f000, 4: 0, 5: 0}
         fmtbpp = 2
-        has_alpha = 1
-        rmask = 0x00000f00
-        gmask = 0x000000f0
-        bmask = 0x0000000f
-        amask = 0x0000f000
 
     elif format_ == 61:  # L8
+        luminance = True
+        compSels = {0: 0x000000ff, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
         fmtbpp = 1
-        has_alpha = 0
-        rmask = 0x000000ff
-        gmask = 0x000000ff
-        bmask = 0x000000ff
-        amask = 0x00000000
-        if compSel.count(3) == 1:
-            has_alpha = 1
-            amask = 0x000000ff
+        if compSel[3] != 0:
+            has_alpha = False
 
-    elif format_ == 49:  # L8A8
+    elif format_ == 49:  # A8L8
+        luminance = True
+        compSels = {0: 0x000000ff, 1: 0x0000ff00, 2: 0, 3: 0, 4: 0, 5: 0}
         fmtbpp = 2
-        has_alpha = 1
-        rmask = 0x000000ff
-        gmask = 0x0000ff00
-        bmask = 0x00000000
-        amask = 0x00000000
 
-    elif format_ == 112:  # L4A4
+    elif format_ == 112:  # A4L4
+        luminance = True
+        compSels = {0: 0x0000000f, 1: 0x000000f0, 2: 0, 3: 0, 4: 0, 5: 0}
         fmtbpp = 1
-        has_alpha = 1
-        rmask = 0x0000000f
-        gmask = 0x000000f0
-        bmask = 0x00000000
-        amask = 0x00000000
 
     flags = 0x00000001 | 0x00001000 | 0x00000004 | 0x00000002
 
@@ -590,16 +313,22 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     if not compressed:
         flags |= 0x00000008
 
-        if (fmtbpp == 1 and not has_alpha) or format_ in [49, 112]:  # LUMINANCE
-            pflags = 0x00020000
+        a = False
 
-        elif fmtbpp == 1 and has_alpha:
+        if compSel[0] != 0 and compSel[1] != 0 and compSel[2] != 0 and compSel[3] == 0: # ALPHA
+            a = True
             pflags = 0x00000002
 
-        else:  # RGB
+        elif luminance:  # LUMINANCE
+            pflags = 0x00020000
+
+        elif RGB:  # RGB
             pflags = 0x00000040
 
-        if (has_alpha and fmtbpp != 1) or format_ == 112:
+        else: # Not possible...
+            return b''
+
+        if has_alpha and not a:
             pflags |= 0x00000001
 
         size = w * fmtbpp
@@ -625,7 +354,7 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif format_ == "BC5S":
             fourcc = b'BC5S'
 
-    hdr[:4] = b'DDS '
+    hdr[0:0 + 4] = b'DDS '
     hdr[4:4 + 4] = 124 .to_bytes(4, 'little')
     hdr[8:8 + 4] = flags.to_bytes(4, 'little')
     hdr[12:12 + 4] = h.to_bytes(4, 'little')
@@ -640,49 +369,10 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     else:
         hdr[88:88 + 4] = (fmtbpp << 3).to_bytes(4, 'little')
 
-        if compSel[0] == 1:
-            hdr[92:92 + 4] = gmask.to_bytes(4, 'little')
-        elif compSel[0] == 2:
-            hdr[92:92 + 4] = bmask.to_bytes(4, 'little')
-        elif compSel[0] == 3:
-            hdr[92:92 + 4] = amask.to_bytes(4, 'little')
-        elif compSel[0] == 4:
-            hdr[92:92 + 4] = 0 .to_bytes(4, 'little')
-        else:
-            hdr[92:92 + 4] = rmask.to_bytes(4, 'little')
-
-        if compSel[1] == 0:
-            hdr[96:96 + 4] = rmask.to_bytes(4, 'little')
-        elif compSel[1] == 2:
-            hdr[96:96 + 4] = bmask.to_bytes(4, 'little')
-        elif compSel[1] == 3:
-            hdr[96:96 + 4] = amask.to_bytes(4, 'little')
-        elif compSel[1] == 4:
-            hdr[96:96 + 4] = 0 .to_bytes(4, 'little')
-        else:
-            hdr[96:96 + 4] = gmask.to_bytes(4, 'little')
-
-        if compSel[2] == 0:
-            hdr[100:100 + 4] = rmask.to_bytes(4, 'little')
-        elif compSel[2] == 1:
-            hdr[100:100 + 4] = gmask.to_bytes(4, 'little')
-        elif compSel[2] == 3:
-            hdr[100:100 + 4] = amask.to_bytes(4, 'little')
-        elif compSel[2] == 4:
-            hdr[100:100 + 4] = 0 .to_bytes(4, 'little')
-        else:
-            hdr[100:100 + 4] = bmask.to_bytes(4, 'little')
-
-        if compSel[3] == 0:
-            hdr[104:104 + 4] = rmask.to_bytes(4, 'little')
-        elif compSel[3] == 1:
-            hdr[104:104 + 4] = gmask.to_bytes(4, 'little')
-        elif compSel[3] == 2:
-            hdr[104:104 + 4] = bmask.to_bytes(4, 'little')
-        elif compSel[3] == 4:
-            hdr[104:104 + 4] = 0 .to_bytes(4, 'little')
-        else:
-            hdr[104:104 + 4] = amask.to_bytes(4, 'little')
+        hdr[92:92 + 4] = compSels[compSel[0]].to_bytes(4, 'little')
+        hdr[96:96 + 4] = compSels[compSel[1]].to_bytes(4, 'little')
+        hdr[100:100 + 4] = compSels[compSel[2]].to_bytes(4, 'little')
+        hdr[104:104 + 4] = compSels[compSel[3]].to_bytes(4, 'little')
 
     hdr[108:108 + 4] = caps.to_bytes(4, 'little')
 

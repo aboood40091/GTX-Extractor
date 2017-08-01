@@ -534,7 +534,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
 
         swizzled_data.append(addrlib.swizzle(max(1, width >> i), max(1, width >> i), surfOut.height, format_, surfOut.tileMode, s, surfOut.pitch, surfOut.bpp, data))
 
-    compSels = ["Red", "Green", "Blue", "Alpha", "0", "1"]
+    compSels = ["R", "G", "B", "A", "0", "1"]
 
     print("")
     print("// ----- GX2Surface Info ----- ")
@@ -554,10 +554,10 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
     print("  pitch           = " + str(pitch))
     print("")
     print("  GX2 Component Selector:")
-    print("    Channel 1:      " + str(compSels[compSel[0]]))
-    print("    Channel 2:      " + str(compSels[compSel[1]]))
-    print("    Channel 3:      " + str(compSels[compSel[2]]))
-    print("    Channel 4:      " + str(compSels[compSel[3]]))
+    print("    Red Channel:    " + str(compSels[compSel[0]]))
+    print("    Green Channel:  " + str(compSels[compSel[1]]))
+    print("    Blue Channel:   " + str(compSels[compSel[2]]))
+    print("    Alpha Channel:  " + str(compSels[compSel[3]]))
     print("")
     print("  bits per pixel  = " + str(bpp << 3))
     print("  bytes per pixel = " + str(bpp))
@@ -675,9 +675,6 @@ def main():
     else:
         output_ = os.path.splitext(input_)[0] + (".gtx" if toGTX else ".dds")
 
-    print("")
-    print('Converting: ' + input_)
-
     if toGTX:
         if "-tileMode" in sys.argv:
             tileMode = int(sys.argv[sys.argv.index("-tileMode") + 1], 0)
@@ -702,7 +699,7 @@ def main():
         if SRGB > 1 or not 0 <= tileMode <= 16 or not 0 <= swizzle <= 7:
             printInfo()
 
-        if "-o" not in sys.argv:
+        if "-o" not in sys.argv and "-multi" in sys.argv:
             output_ = output_[:-5] + ".gtx"
 
         with open(output_, "wb+") as output:
@@ -714,9 +711,15 @@ def main():
             if multi:
                 input_ = input_[:-5]
                 for i in range(numImages):
+                    print("")
+                    print('Converting: ' + input_ + str(i) + ".dds")
+                    
                     data = writeGFD(input_ + str(i) + ".dds", tileMode, swizzle, SRGB, i, numImages)
                     output.write(data)
             else:
+                print("")
+                print('Converting: ' + input_)
+
                 data = writeGFD(input_, tileMode, swizzle, SRGB, 0, 1)
                 output.write(data)
 
@@ -726,10 +729,13 @@ def main():
             output.write(eof_blk_head)
 
     else:
+        print("")
+        print('Converting: ' + input_)
+
         with open(input_, "rb") as inf:
             inb = inf.read()
 
-        compSel = ["Red", "Green", "Blue", "Alpha", "0", "1"]
+        compSel = ["R", "G", "B", "A", "0", "1"]
 
         gfd = readGFD(inb)
 
@@ -757,10 +763,10 @@ def main():
             bpp = addrlib.surfaceGetBitsPerPixel(gfd.format[i])
             print("")
             print("  GX2 Component Selector:")
-            print("    Channel 1:      " + str(compSel[gfd.compSel[i][0]]))
-            print("    Channel 2:      " + str(compSel[gfd.compSel[i][1]]))
-            print("    Channel 3:      " + str(compSel[gfd.compSel[i][2]]))
-            print("    Channel 4:      " + str(compSel[gfd.compSel[i][3]]))
+            print("    Red Channel:    " + str(compSel[gfd.compSel[i][0]]))
+            print("    Green Channel:  " + str(compSel[gfd.compSel[i][1]]))
+            print("    Blue Channel:   " + str(compSel[gfd.compSel[i][2]]))
+            print("    Alpha Channel:  " + str(compSel[gfd.compSel[i][3]]))
             print("")
             print("  bits per pixel  = " + str(bpp))
             print("  bytes per pixel = " + str(bpp // 8))

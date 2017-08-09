@@ -471,6 +471,20 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
             time.sleep(5)
             sys.exit(1)
 
+    if format_ not in formats:
+        print("")
+        print("Unsupported DDS format!")
+        print("")
+        if n != (numImages - 1):
+            print("")
+            print("Continuing in 5 seconds...")
+            time.sleep(5)
+            return b''
+        else:
+            print("Exiting in 5 seconds...")
+            time.sleep(5)
+            sys.exit(1)
+
     if numMips > 13:
         print("")
         print("Invalid number of mipmaps for " + f)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.1
+# Version v5.2
 # Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
 
 # This file is part of GTX Extractor.
@@ -25,7 +25,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = '5.1'
+version = '5.2'
 
 # Pick a build directory
 dir_ = 'gtx_extract v' + version

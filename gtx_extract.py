@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.1
+# Version v5.2
 # Copyright © 2014 Treeki, 2015-2017 Stella/AboodXD
 
 # This file is part of GTX Extractor.
@@ -688,7 +688,7 @@ def printInfo():
 
 
 def main():
-    print("GTX Extractor v5.1")
+    print("GTX Extractor v5.2")
     print("(C) 2014 Treeki, 2015-2017 Stella/AboodXD")
 
     input_ = sys.argv[-1]

@@ -134,7 +134,7 @@ def readDDS(f, SRGB):
             format_ = 0x35
             bpp = 16
 
-        elif fourcc == b'BC4S':
+        elif fourcc == b'BC5S':
             format_ = 0x235
             bpp = 16
 

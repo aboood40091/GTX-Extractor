@@ -577,7 +577,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
 
             mipSize += len(data)
 
-        swizzled_data.append(addrlib.swizzle(max(1, width >> i), max(1, width >> i), surfOut.height, format_, surfOut.tileMode, s, surfOut.pitch, surfOut.bpp, data))
+        swizzled_data.append(addrlib.swizzle(max(1, width >> i), max(1, height >> i), surfOut.height, format_, surfOut.tileMode, s, surfOut.pitch, surfOut.bpp, data))
 
     compSels = ["R", "G", "B", "A", "0", "1"]
 

@@ -44,7 +44,7 @@ setup(
     name = 'GTX Extractor',
     version = version,
     description = 'Wii U GTX Extractor',
-    author = "AboodXD",
+    author = "Stella/AboodXD",
     options={
         'build_exe': {
             'compressed': 1,

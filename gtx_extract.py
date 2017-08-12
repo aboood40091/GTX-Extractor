@@ -210,7 +210,7 @@ def readGFD(f):
                 comp = f[pos + i]
                 if comp == 4: # Sorry, but this is unsupported.
                     comp = i
-                compSel.append(f[pos + i])
+                compSel.append(comp)
 
             pos += 24
 

@@ -77,29 +77,6 @@ cpdef bytes rgb8torgbx8(u8[:] data):
     return bytes(new_data)
 
 
-cpdef bytes torgba8(u8[:] data, u32 bytesPerPixel, u8 compSel[6]):
-    assert bytesPerPixel <= 4
-
-    cdef u32 numPixels = len(data) // bytesPerPixel
-
-    cdef u8[:] new_data = [0] * numPixels * 4
-    cdef u8 pixel[6]
-
-    cdef u32 i, z
-
-    for i in range(numPixels):
-        pixel = [255, 255, 255, 255, 0, 255]
-        for z in range(bytesPerPixel):
-            pixel[z] = data[bytesPerPixel * i + z]
-
-        new_data[4 * i + 0] = pixel[compSel[0]]
-        new_data[4 * i + 1] = pixel[compSel[1]]
-        new_data[4 * i + 2] = pixel[compSel[2]]
-        new_data[4 * i + 3] = pixel[compSel[3]]
-
-    return bytes(new_data)
-
-
 cpdef bytes swapRB_RGB565(u8[:] data):
     cdef u32 numPixels = len(data) // 2
 

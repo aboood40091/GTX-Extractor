@@ -63,26 +63,6 @@ def rgb8torgbx8(data):
     return bytes(new_data)
 
 
-def torgba8(data, bytesPerPixel, compSel):
-    assert bytesPerPixel <= 4
-
-    numPixels = len(data) // bytesPerPixel
-
-    new_data = bytearray(numPixels * 4)
-
-    for i in range(numPixels):
-        pixel = [255, 255, 255, 255, 0, 255]
-        for z in range(bytesPerPixel):
-            pixel[z] = data[bytesPerPixel * i + z]
-
-        new_data[4 * i + 0] = pixel[compSel[0]]
-        new_data[4 * i + 1] = pixel[compSel[1]]
-        new_data[4 * i + 2] = pixel[compSel[2]]
-        new_data[4 * i + 3] = pixel[compSel[3]]
-
-    return bytes(new_data)
-
-
 def swapRB_RGB565(data):
     numPixels = len(data) // 2
 

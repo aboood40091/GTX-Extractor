@@ -1884,26 +1884,26 @@ def getSurfaceInfo(u32 surfaceFormat, u32 surfaceWidth, u32 surfaceHeight, u32 s
     # and return it instead
     pypOut = pySurfaceOut()
 
-    pypOut.size = pOut.size
-    pypOut.pitch = pOut.pitch
-    pypOut.height = pOut.height
-    pypOut.depth = pOut.depth
-    pypOut.surfSize = pOut.surfSize
-    pypOut.tileMode = pOut.tileMode
-    pypOut.baseAlign = pOut.baseAlign
-    pypOut.pitchAlign = pOut.pitchAlign
-    pypOut.heightAlign = pOut.heightAlign
-    pypOut.depthAlign = pOut.depthAlign
-    pypOut.bpp = pOut.bpp
-    pypOut.pixelPitch = pOut.pixelPitch
-    pypOut.pixelHeight = pOut.pixelHeight
-    pypOut.pixelBits = pOut.pixelBits
-    pypOut.sliceSize = pOut.sliceSize
-    pypOut.pitchTileMax = pOut.pitchTileMax
-    pypOut.heightTileMax = pOut.heightTileMax
-    pypOut.sliceTileMax = pOut.sliceTileMax
-    pypOut.pTileInfo = pOut.pTileInfo
-    pypOut.tileType = pOut.tileType
-    pypOut.tileIndex = pOut.tileIndex
+    pypOut.size = pSurfOut.size
+    pypOut.pitch = pSurfOut.pitch
+    pypOut.height = pSurfOut.height
+    pypOut.depth = pSurfOut.depth
+    pypOut.surfSize = pSurfOut.surfSize
+    pypOut.tileMode = pSurfOut.tileMode
+    pypOut.baseAlign = pSurfOut.baseAlign
+    pypOut.pitchAlign = pSurfOut.pitchAlign
+    pypOut.heightAlign = pSurfOut.heightAlign
+    pypOut.depthAlign = pSurfOut.depthAlign
+    pypOut.bpp = pSurfOut.bpp
+    pypOut.pixelPitch = pSurfOut.pixelPitch
+    pypOut.pixelHeight = pSurfOut.pixelHeight
+    pypOut.pixelBits = pSurfOut.pixelBits
+    pypOut.sliceSize = pSurfOut.sliceSize
+    pypOut.pitchTileMax = pSurfOut.pitchTileMax
+    pypOut.heightTileMax = pSurfOut.heightTileMax
+    pypOut.sliceTileMax = pSurfOut.sliceTileMax
+    pypOut.pTileInfo = pSurfOut.pTileInfo
+    pypOut.tileType = pSurfOut.tileType
+    pypOut.tileIndex = pSurfOut.tileIndex
 
     return pypOut

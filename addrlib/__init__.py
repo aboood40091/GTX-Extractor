@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 
 # Addrlib
-# Copyright © 2015-2018 AboodXD
+# Copyright © 2018 AboodXD
 
 # Addrlib
 # A Python/Cython Address Library for Wii U textures.
 
 try:
     import pyximport
-
     pyximport.install()
+
     from . import addrlib_cy as addrlib
 
 except:

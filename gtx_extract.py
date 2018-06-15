@@ -502,7 +502,22 @@ def warn_color():
     print("Warning: colors might mess up!!")
 
 
-def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
+def round_up(x, y):
+    return ((x - 1) | (y - 1)) + 1
+
+
+def getAlignBlockSize(dataOffset, alignment):
+    alignSize = round_up(dataOffset, alignment) - dataOffset - 32
+
+    z = 1
+    while alignSize <= 0:
+        alignSize = round_up(dataOffset + (alignment * z), alignment) - dataOffset - 32
+        z += 1
+
+    return alignSize
+
+
+def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
     width, height, format_, fourcc, dataSize, compSel, numMips, data = dds.readDDS(f, SRGB)
 
     if 0 in [width, dataSize] and data == []:
@@ -554,26 +569,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
     mipData = data[dataSize:]
     numMips += 1
 
-    mipAlign = 0
-    align = 0
-
-    if numImages == 1:
-        if format_ in BCn_formats:
-            if format_ in [0x31, 0x431, 0x234, 0x34]:
-                align = 0xEE4
-                mipAlign = 0xFC0
-
-            else:
-                align = 0x1EE4
-                mipAlign = 0x1FC0
-
-        else:
-            align = 0x6E4
-            mipAlign = 0x7C0
-
     bpp = addrlib.surfaceGetBitsPerPixel(format_) >> 3
-
-    alignment = 512 * bpp
 
     surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, 0)
 
@@ -606,15 +602,15 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
         print("")
         print("Processing " + str(numMips - 1) + " mipmaps:")
 
+    imageSize = round_up(surfOut.surfSize, 0x200)
+    alignment = surfOut.baseAlign
+
     swizzled_data = []
-    imageSize = 0
     mipSize = 0
     mipOffsets = []
     for i in range(numMips):
         if i == 0:
             data = imageData
-
-            imageSize = surfOut.surfSize
 
         else:
             print(str(i) + ": " + str(max(1, width >> i)) + "x" + str(max(1, height >> i)))
@@ -625,17 +621,15 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
 
             surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, i)
 
-        padSize = surfOut.surfSize - dataSize
-        data += padSize * b"\x00"
+        padSize = round_up(surfOut.surfSize, surfOut.baseAlign) - len(data)
+        data = b''.join([data, padSize * b'\0'])
 
         if i != 0:
-            offset += padSize
-
             if i == 1:
                 mipOffsets.append(imageSize)
 
             else:
-                mipOffsets.append(offset)
+                mipOffsets.append(mipSize)
 
             mipSize += len(data)
 
@@ -726,14 +720,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
     gx2surf = gx2surf_struct.pack(1, width, height, 1, numMips, format_, 0, 1, imageSize, 0, mipSize, 0, tileMode, s,
                                   alignment, pitch)
 
-    if align:
-        align_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, align, 0, 0)
-
     image_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xc, imageSize, 0, 0)
-
-    if mipAlign:
-        mipAlign_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, mipAlign, 0, 0)
-
     mip_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xd, mipSize, 0, 0)
 
     output = gx2surf_blk_head + gx2surf
@@ -748,35 +735,34 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, numImages):
             output += 0 .to_bytes(4, 'big')
 
     else:
-        output += b"\x00" * 56
+        output += b'\0' * 56
 
     output += numMips.to_bytes(4, 'big')
-    output += b"\x00" * 4
+    output += b'\0' * 4
     output += 1 .to_bytes(4, 'big')
 
     for value in compSel:
         output += value.to_bytes(1, 'big')
 
-    output += b"\x00" * 20
+    output += b'\0' * 20
 
-    if align:
-        output += align_blk_head
-        output += b"\x00" * align
+    alignSize = getAlignBlockSize(pos + len(output) + 32, alignment)
+    align_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, alignSize, 0, 0)
 
+    output += align_blk_head
+    output += b'\0' * alignSize
     output += image_blk_head
     output += swizzled_data[0]
 
     if numMips > 1:
-        if mipAlign:
-            output += mipAlign_blk_head
-            output += b"\x00" * mipAlign
-
+        mipAlignSize = getAlignBlockSize(pos + len(output) + 32, alignment)
+        mipAlign_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, mipAlignSize, 0, 0)
+        output += mipAlign_blk_head
+        output += b'\0' * mipAlignSize
         output += mip_blk_head
-        i = 0
-        for data in swizzled_data:
-            if i != 0:
-                output += data
-            i += 1
+
+        for i in range(1, len(swizzled_data)):
+            output += swizzled_data[i]
 
     return output
 
@@ -870,31 +856,38 @@ def main():
         if "-o" not in sys.argv and "-multi" in sys.argv:
             output_ = output_[:-5] + ".gtx"
 
-        with open(output_, "wb+") as output:
-            head_struct = GFDHeader()
-            head = head_struct.pack(b"Gfx2", 32, 7, 1, 2, 1, 0, 0)
+        outBuffer = bytearray()
+        head_struct = GFDHeader()
+        head = head_struct.pack(b"Gfx2", 32, 7, 1, 2, 1, 0, 0)
 
-            output.write(head)
+        pos = 32
 
-            if multi:
-                input_ = input_[:-5]
-                for i in range(numImages):
-                    print("")
-                    print('Converting: ' + input_ + str(i) + ".dds")
+        outBuffer += head
 
-                    data = writeGFD(input_ + str(i) + ".dds", tileMode, swizzle, SRGB, i, numImages)
-                    output.write(data)
-            else:
+        if multi:
+            input_ = input_[:-5]
+            for i in range(numImages):
                 print("")
-                print('Converting: ' + input_)
+                print('Converting: ' + input_ + str(i) + ".dds")
 
-                data = writeGFD(input_, tileMode, swizzle, SRGB, 0, 1)
-                output.write(data)
+                data = writeGFD(input_ + str(i) + ".dds", tileMode, swizzle, SRGB, i, pos, numImages)
+                pos += len(data)
 
-            block_head_struct = GFDBlockHeader()
-            eof_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 1, 0, 0, 0)
+                outBuffer += data
+        else:
+            print("")
+            print('Converting: ' + input_)
 
-            output.write(eof_blk_head)
+            data = writeGFD(input_, tileMode, swizzle, SRGB, 0, pos, 1)
+            outBuffer += data
+
+        block_head_struct = GFDBlockHeader()
+        eof_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 1, 0, 0, 0)
+
+        outBuffer += eof_blk_head
+
+        with open(output_, "wb+") as output:
+            output.write(outBuffer)
 
     else:
         print("")
@@ -947,6 +940,7 @@ def main():
 
             if hdr == b'' or result == []:
                 pass
+
             else:
                 with open(output_, "wb+") as output:
                     output.write(hdr)

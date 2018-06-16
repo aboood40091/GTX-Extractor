@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Copyright © 2018 AboodXD
+# Licensed under GNU GPLv3
+
 def _register0(width, pitch, tileType, tileMode, dim):
     return (
         (width & 0x1FFF) << 19
@@ -76,7 +82,7 @@ def makeRegsBytearray(width, height, numMips, format_, tileMode, pitch, compSel)
         numFormat = 2
 
     elif format_ & 0x100:
-      numFormat = 1
+        numFormat = 1
 
     if format_ & 0x400:
         forceDegamma = 1

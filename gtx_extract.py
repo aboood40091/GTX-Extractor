@@ -59,6 +59,12 @@ formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
 
 BCn_formats = [0x31, 0x431, 0x32, 0x432, 0x33, 0x433, 0x34, 0x234, 0x35, 0x235]
 
+Use = [
+    0, 3, 1, 0, 0, 7, 3, 3, 11, 1, 3, 3, 3, 3, 7, 3, 3, 5, 0,
+    3, 0, 0, 3, 0, 0, 11, 11, 11, 5, 3, 3, 3, 3, 0, 3, 3, 0,
+    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+]
+
 
 class GFDData:
     pass
@@ -724,7 +730,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
     gx2surf_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xb, 0x9c, 0, 0)
 
     gx2surf_struct = GX2Surface()
-    gx2surf = gx2surf_struct.pack(1, width, height, 1, numMips, format_, 0, 1, imageSize, 0, mipSize, 0, tileMode, s,
+    gx2surf = gx2surf_struct.pack(1, width, height, 1, numMips, format_, 0, Use[format_ & 0x3F], imageSize, 0, mipSize, 0, tileMode, s,
                                   alignment, pitch)
 
     image_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xc, imageSize, 0, 0)

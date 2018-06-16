@@ -140,6 +140,9 @@ def readGFD(f):
     else:
         raise ValueError("Unsupported GTX version!")
 
+    if header.gpuVersion != 2:
+        raise ValueError("Unsupported GPU version!")
+
     gfd.majorVersion = header.majorVersion
 
     pos += header.size
@@ -602,29 +605,32 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
         print("")
         print("Processing " + str(numMips - 1) + " mipmaps:")
 
-    imageSize = round_up(surfOut.surfSize, 0x200)
-    alignment = surfOut.baseAlign
-
     swizzled_data = []
     mipSize = 0
     mipOffsets = []
     for i in range(numMips):
+        nextLevelAlignment = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, i + 1).baseAlign
+
         if i == 0:
             data = imageData
+
+            imageSize = round_up(surfOut.surfSize, nextLevelAlignment)
+            alignment = surfOut.baseAlign
+
+            padSize = imageSize - len(data)
+            data = b''.join([data, padSize * b'\0'])
 
         else:
             print(str(i) + ": " + str(max(1, width >> i)) + "x" + str(max(1, height >> i)))
 
             offset, dataSize = get_curr_mip_off_size(width, height, bpp, i, format_ in BCn_formats)
-
             data = mipData[offset:offset + dataSize]
 
             surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, i)
 
-        padSize = round_up(surfOut.surfSize, surfOut.baseAlign) - len(data)
-        data = b''.join([data, padSize * b'\0'])
+            padSize = round_up(surfOut.surfSize, nextLevelAlignment) - len(data)
+            data = b''.join([data, padSize * b'\0'])
 
-        if i != 0:
             if i == 1:
                 mipOffsets.append(imageSize)
 

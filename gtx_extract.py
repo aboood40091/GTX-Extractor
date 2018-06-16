@@ -29,6 +29,7 @@ import time
 
 import addrlib
 import dds
+from texRegisters import makeRegsBytearray
 
 __author__ = "AboodXD"
 __copyright__ = "Copyright 2015-2018 AboodXD"
@@ -750,7 +751,11 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
     for value in compSel:
         output += value.to_bytes(1, 'big')
 
-    output += b'\0' * 20
+    if format_ in BCn_formats:
+        output += makeRegsBytearray(width, height, numMips, format_, tileMode, pitch * 4, compSel)
+
+    else:
+        output += makeRegsBytearray(width, height, numMips, format_, tileMode, pitch, compSel)
 
     alignSize = getAlignBlockSize(pos + len(output) + 32, alignment)
     align_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 2, alignSize, 0, 0)

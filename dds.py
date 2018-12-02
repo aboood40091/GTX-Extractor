@@ -36,6 +36,8 @@ try:
 except ImportError:
     import form_conv
 
+dx10_formats = ["BC4U", "BC4S", "BC5U", "BC5S"]
+
 
 def readDDS(f, SRGB):
     with open(f, "rb") as inf:
@@ -51,12 +53,6 @@ def readDDS(f, SRGB):
     height = struct.unpack("<I", inb[12:16])[0]
 
     fourcc = inb[84:88]
-
-    if fourcc == b'DX10':
-        print("")
-        print("DX10 DDS files are not supported.")
-
-        return 0, 0, 0, b'', 0, [], 0, []
 
     pflags = struct.unpack("<I", inb[80:84])[0]
     bpp = struct.unpack("<I", inb[88:92])[0] >> 3
@@ -113,6 +109,18 @@ def readDDS(f, SRGB):
     format_ = 0
     compSel = [0, 1, 2, 3]
 
+    if fourcc == b'DX10':
+        if not compressed:
+            print("")
+            print("Uncompressed DX10 DDS files are not supported.")
+
+            return 0, 0, 0, b'', 0, [], 0, []
+
+        headSize = 0x94
+
+    else:
+        headSize = 0x80
+
     if compressed:
         if fourcc == b'ETC1':
             format_ = 0x31
@@ -145,6 +153,23 @@ def readDDS(f, SRGB):
         elif fourcc == b'BC5S':
             format_ = 0x235
             bpp = 16
+
+        elif fourcc == b'DX10':
+            if inb[128:148] == b"\x50\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00":
+                format_ = 0x34
+                bpp = 8
+
+            elif inb[128:148] == b"\x51\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00":
+                format_ = 0x234
+                bpp = 8
+
+            elif inb[128:148] == b"\x53\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00":
+                format_ = 0x35
+                bpp = 16
+
+            elif inb[128:148] == b"\x54\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00":
+                format_ = 0x235
+                bpp = 16
 
         size = ((width + 3) >> 2) * ((height + 3) >> 2) * bpp
 
@@ -217,7 +242,7 @@ def readDDS(f, SRGB):
         numMips = 0
         mipSize = 0
 
-    if len(inb) < 0x80 + size + mipSize:
+    if len(inb) < headSize + size + mipSize:
         print("")
         print(f + " is not a valid DDS file!")
 
@@ -229,7 +254,7 @@ def readDDS(f, SRGB):
 
         return 0, 0, 0, b'', 0, [], 0, []
 
-    data = bytearray(inb[0x80:0x80 + size + mipSize])
+    data = bytearray(inb[headSize:headSize + size + mipSize])
 
     if format_ in [0x1a, 0x41a] and bpp == 3:
         data = form_conv.rgb8torgbx8(data)
@@ -358,17 +383,8 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
         elif format_ == "BC3":
             fourcc = b'DXT5'
 
-        elif format_ == "BC4U":
-            fourcc = b'ATI1'
-
-        elif format_ == "BC4S":
-            fourcc = b'BC4S'
-
-        elif format_ == "BC5U":
-            fourcc = b'ATI2'
-
-        elif format_ == "BC5S":
-            fourcc = b'BC5S'
+        elif format_ in dx10_formats:
+            fourcc = b'DX10'
 
     hdr[0:0 + 4] = b'DDS '
     hdr[4:4 + 4] = 124 .to_bytes(4, 'little')
@@ -386,11 +402,42 @@ def generateHeader(num_mipmaps, w, h, format_, compSel, size, compressed):
     else:
         hdr[88:88 + 4] = (fmtbpp << 3).to_bytes(4, 'little')
 
-        hdr[92:92 + 4] = compSels[compSel[0]].to_bytes(4, 'little')
-        hdr[96:96 + 4] = compSels[compSel[1]].to_bytes(4, 'little')
-        hdr[100:100 + 4] = compSels[compSel[2]].to_bytes(4, 'little')
-        hdr[104:104 + 4] = compSels[compSel[3]].to_bytes(4, 'little')
+        if compSel[0] in compSels:
+            hdr[92:92 + 4] = compSels[compSel[0]].to_bytes(4, 'little')
+
+        else:
+            hdr[92:92 + 4] = compSels[0].to_bytes(4, 'little')
+
+        if compSel[1] in compSels:
+            hdr[96:96 + 4] = compSels[compSel[1]].to_bytes(4, 'little')
+
+        else:
+            hdr[96:96 + 4] = compSels[1].to_bytes(4, 'little')
+
+        if compSel[2] in compSels:
+            hdr[100:100 + 4] = compSels[compSel[2]].to_bytes(4, 'little')
+
+        else:
+            hdr[100:100 + 4] = compSels[2].to_bytes(4, 'little')
+
+        if compSel[3] in compSels:
+            hdr[104:104 + 4] = compSels[compSel[3]].to_bytes(4, 'little')
+
+        else:
+            hdr[104:104 + 4] = compSels[3].to_bytes(4, 'little')
 
     hdr[108:108 + 4] = caps.to_bytes(4, 'little')
+
+    if format_ == "BC4U":
+        hdr += bytearray(b"\x50\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00")
+
+    elif format_ == "BC4S":
+        hdr += bytearray(b"\x51\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00")
+
+    elif format_ == "BC5U":
+        hdr += bytearray(b"\x53\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00")
+
+    elif format_ == "BC5S":
+        hdr += bytearray(b"\x54\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00")
 
     return hdr

@@ -202,7 +202,7 @@ def readGFD(f):
 
             pos += surface.size
 
-            if 1 <= surface.tileMode <= 16:
+            if not 1 <= surface.tileMode <= 16:
                 print("")
                 print("Invalid tileMode for image " + str(imgInfo - 1))
                 print("")

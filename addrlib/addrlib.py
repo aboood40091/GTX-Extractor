@@ -1231,6 +1231,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
     surfaceAA: AA mode of the surface (GX2AAMode)
     level: mip level of which the info will be calculated for (first mipmap corresponds to value 1)
     """
+
     dim = 0
     width = 0
     blockSize = 0

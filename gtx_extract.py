@@ -202,6 +202,14 @@ def readGFD(f):
 
             pos += surface.size
 
+            if 1 <= surface.tileMode <= 16:
+                print("")
+                print("Invalid tileMode for image " + str(imgInfo - 1))
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
+
             if surface.numMips > 14:
                 print("")
                 print("Invalid number of mipmaps for image " + str(imgInfo - 1))

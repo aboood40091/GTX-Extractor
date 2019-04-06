@@ -24,8 +24,65 @@ cdef list BCn_formats = [
 ]
 
 
+cpdef u32 getDefaultGX2TileMode(u32 dim, u32 width, u32 height, u32 depth, u32 format_, u32 aa, u32 use):
+    """
+    dim: dim of the surface (GX2SurfaceDim)
+    width: width of the surface
+    height: height of the surface
+    depth: depth of the surface
+    format_: format of the surface (GX2SurfaceFormat)
+    aa: AA mode of the surface (GX2AAMode)
+    use: use of the surface (GX2SurfaceUse)
+    """
+
+    cdef:
+        u32 tileMode = 1
+        u32 isDepthBuffer = use & 4
+        u32 isColorBuffer = use & 2
+
+    if dim or aa or isDepthBuffer:
+        if dim != 2 or isColorBuffer:
+            tileMode = 4
+
+        else:
+            tileMode = 7
+
+        surfOut = getSurfaceInfo(format_, width, height, depth, dim, tileMode, aa, 0)
+        if width < surfOut.pitchAlign and height < surfOut.heightAlign:
+            if tileMode == 7:
+                tileMode = 3
+
+            else:
+                tileMode = 2
+
+    return tileMode
+
+
+cdef GX2TileModeToAddrTileMode(tileMode):
+    if not tileMode:
+        raise RuntimeError("Use tileMode from getDefaultGX2TileMode().")
+
+    if tileMode == 16:
+        return 0
+
+    return tileMode
+
+
 cdef bytes swizzleSurf(u32 width, u32 height, u32 height_, u32 format_, u32 tileMode, u32 swizzle_,
                            u32 pitch, u32 bitsPerPixel, u8 *data, u32 dataSize, int swizzle):
+
+    """
+    width: width of the surface
+    height: height of the surface
+    height_: aligned height of the surface (can be calculated using getSurfaceInfo())
+    format_: format of the surface (GX2SurfaceFormat)
+    tileMode: tileMode of the surface (GX2TileMode)
+    swizzle_: swizzle of the surface (GX2Surface.swizzle)
+    pitch: aligned width of the surface (can be calculated using getSurfaceInfo())
+    bitsPerPixel: bits per element for the given format (use surfaceGetBitsPerPixel())
+    data: data to be (un)swizzled
+    swizzle: boolen where the data will be swizzled if true, otherwise unswizzled
+    """
 
     cdef:
         u32 bytesPerPixel = bitsPerPixel // 8
@@ -40,6 +97,8 @@ cdef bytes swizzleSurf(u32 width, u32 height, u32 height_, u32 format_, u32 tile
 
     pipeSwizzle = (swizzle_ >> 8) & 1
     bankSwizzle = (swizzle_ >> 9) & 3
+
+    tileMode = GX2TileModeToAddrTileMode(tileMode)
 
     for y in range(height):
         for x in range(width):
@@ -455,6 +514,10 @@ cdef u32 powTwoAlign(u32 x, u32 align):
     return ~(align - 1) & (x + align - 1)
 
 
+cdef u32 powTwoAlign_0(u32 x, u32 align):
+    return (x + align - 1) & ~(align - 1)
+
+
 cdef u32 nextPow2(u32 dim):
     cdef u32 newDim = 1
     if dim <= 0x7FFFFFFF:
@@ -633,31 +696,27 @@ cdef u32 computeSurfaceMipLevelTileMode(u32 baseTileMode, u32 bpp, u32 level, u3
 
         u32 widtha, heighta, numSlicesa, thickness, microTileBytes
 
-    if baseTileMode == 7:
-        if numSamples > 1 or tileSlices > 1 or isDepth:
+    if numSamples > 1 or tileSlices > 1 or isDepth:
+        if baseTileMode == 7:
             expTileMode = 4
 
-    elif baseTileMode == 13:
-        if numSamples > 1 or tileSlices > 1 or isDepth:
+        elif baseTileMode == 13:
             expTileMode = 12
 
-    elif baseTileMode == 11:
-        if numSamples > 1 or tileSlices > 1 or isDepth:
+        elif baseTileMode == 11:
             expTileMode = 8
 
-    elif baseTileMode == 15:
-        if numSamples > 1 or tileSlices > 1 or isDepth:
+        elif baseTileMode == 15:
             expTileMode = 14
 
-    elif baseTileMode == 2:
-        if numSamples > 1:
-            expTileMode = 4
+    if baseTileMode == 2 and numSamples > 1:
+        expTileMode = 4
 
     elif baseTileMode == 3:
         if numSamples > 1 or isDepth:
             expTileMode = 2
 
-        if numSamples in [2, 4]:
+        if numSamples in [2, 4]:  # Mistake, should be elif?
             expTileMode = 7
 
     if not noRecursive:
@@ -698,16 +757,15 @@ cdef u32 computeSurfaceMipLevelTileMode(u32 baseTileMode, u32 bpp, u32 level, u3
                 if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
                     expTileMode = 3
 
-            if expTileMode == 3:
-                if numSlicesa < 4:
+            if numSlicesa < 4:
+                if expTileMode == 3:
                     expTileMode = 2
 
-            elif expTileMode == 7:
-                if numSlicesa < 4:
+                elif expTileMode == 7:
                     expTileMode = 4
 
-            elif expTileMode == 13 and numSlicesa < 4:
-                expTileMode = 12
+                elif expTileMode == 13:
+                    expTileMode = 12
 
             return computeSurfaceMipLevelTileMode(
                 expTileMode,
@@ -744,7 +802,7 @@ cdef (u32, u32, u32) padDimensions(u32 tileMode, u32 padDims, u32 isCube, u32 cu
         expHeight = powTwoAlign(expHeight, heightAlign)
 
     if padDims > 2 or thickness > 1:
-        if isCube:
+        if isCube or cubeAsArray:
             expNumSlices = nextPow2(expNumSlices)
 
         if thickness > 1:
@@ -755,7 +813,7 @@ cdef (u32, u32, u32) padDimensions(u32 tileMode, u32 padDims, u32 isCube, u32 cu
 
 cdef u32 adjustPitchAlignment(Flags flags, u32 pitchAlign):
     if (flags.value >> 13) & 1:
-        pitchAlign = powTwoAlign(pitchAlign, 0x20)
+        pitchAlign = powTwoAlign_0(pitchAlign, 0x20)
 
     return pitchAlign
 
@@ -765,21 +823,20 @@ cdef (u32, u32, u32) computeSurfaceAlignmentsLinear(u32 tileMode, u32 bpp, Flags
         u32 pixelsPerPipeInterleave
         u32 baseAlign, pitchAlign, heightAlign
 
-    if tileMode:
-        if tileMode == 1:
-            pixelsPerPipeInterleave = 2048 // bpp
-            baseAlign = 256
-            pitchAlign = max(0x40, pixelsPerPipeInterleave)
-            heightAlign = 1
+    if not tileMode:
+        baseAlign = 1
+        pitchAlign = 1 if bpp != 1 else 8
+        heightAlign = 1
 
-        else:
-            baseAlign = 1
-            pitchAlign = 1
-            heightAlign = 1
+    elif tileMode == 1:
+        pixelsPerPipeInterleave = 2048 // bpp
+        baseAlign = 256
+        pitchAlign = max(0x40, pixelsPerPipeInterleave)
+        heightAlign = 1
 
     else:
         baseAlign = 1
-        pitchAlign = 1 if bpp != 1 else 8
+        pitchAlign = 1
         heightAlign = 1
 
     pitchAlign = adjustPitchAlignment(flags, pitchAlign)
@@ -1234,8 +1291,6 @@ cdef void computeSurfaceInfo(surfaceIn aSurfIn, surfaceOut pSurfOut):
     pOut = pSurfOut
 
     cdef:
-        tileInfo tileInfoNull = tileInfo()
-        u32 sliceFlags = 0
         u32 returnCode = 0
 
         u32 width, height, bpp, elemMode
@@ -1281,11 +1336,7 @@ cdef void computeSurfaceInfo(surfaceIn aSurfIn, surfaceOut pSurfOut):
             if pIn.format and (not (pIn.flags.value >> 9) & 1 or not pIn.mipLevel):
                 bpp = restoreSurfaceInfo(elemMode, expandX, expandY, bpp)
 
-            if sliceFlags:
-                if sliceFlags == 1:
-                    pOut.sliceSize = (pOut.height * pOut.pitch * pOut.bpp * pIn.numSamples + 7) // 8
-
-            elif (pIn.flags.value >> 5) & 1:
+            if (pIn.flags.value >> 5) & 1:
                 pOut.sliceSize = pOut.surfSize
 
             else:
@@ -1300,6 +1351,17 @@ cdef void computeSurfaceInfo(surfaceIn aSurfIn, surfaceOut pSurfOut):
 
 
 def getSurfaceInfo(u32 surfaceFormat, u32 surfaceWidth, u32 surfaceHeight, u32 surfaceDepth, u32 surfaceDim, u32 surfaceTileMode, u32 surfaceAA, u32 level):
+    """
+    surfaceFormat: format of the surface (GX2SurfaceFormat)
+    surfaceWidth: width of the surface
+    surfaceHeight: height of the surface
+    surfaceDepth: depth of the surface
+    surfaceDim: dim of the surface (GX2SurfaceDim)
+    surfaceTileMode: GX2TileMode (note: NOT AddrTileMode)
+    surfaceAA: AA mode of the surface (GX2AAMode)
+    level: mip level of which the info will be calculated for (first mipmap corresponds to value 1)
+    """
+
     cdef:
         u32 dim = 0
         u32 width = 0

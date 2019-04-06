@@ -75,7 +75,7 @@ cdef u16 _swapRB_argb4(u16 pixel):
     return <u16>((red << 12) | (green << 8) | (blue << 4) | alpha)
 
 
-cpdef bytes swapRB_16bpp(bytes data, str format_):
+cpdef bytes swapRB_16bpp(bytearray data, str format_):
     cdef:
         u32 numPixels = len(data) // 2
 
@@ -161,7 +161,7 @@ cdef u32 _swapRB_rgba8(u32 pixel):
     return <u32>((alpha << 24) | (red << 16) | (green << 8) | blue)
 
 
-cpdef bytes swapRB_32bpp(bytes data, str format_):
+cpdef bytes swapRB_32bpp(bytearray data, str format_):
     cdef:
         u32 numPixels = len(data) // 4
 

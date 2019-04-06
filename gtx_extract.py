@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.3
-# Copyright © 2015-2018 AboodXD
+# Version v5.4
+# Copyright © 2015-2019 AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""gtx_extract.py: Decode GTX images."""
+"""gtx_extract.py: Decode and encode GTX files."""
 
 import os
 import struct
@@ -32,8 +32,8 @@ import dds
 from texRegisters import makeRegsBytearray
 
 __author__ = "AboodXD"
-__copyright__ = "Copyright 2015-2018 AboodXD"
-__credits__ = ["AboodXD", "AddrLib", "Exzap"]
+__copyright__ = "Copyright 2015-2019 AboodXD"
+__credits__ = ["AboodXD", "AMD", "Exzap"]
 
 formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
            0x0000001a: 'GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM',
@@ -74,7 +74,7 @@ class GFDHeader(struct.Struct):
          self.majorVersion,
          self.minorVersion,
          self.gpuVersion,
-         self.alignMode,
+         self.alignMode,  # Unused in v6.0
          self.reserved1,
          self.reserved2) = self.unpack_from(data, pos)
 
@@ -134,12 +134,12 @@ def readGFD(f):
     if header.magic != b'Gfx2':
         raise ValueError("Invalid file header!")
 
-    if header.majorVersion == 6:
+    if header.majorVersion == 6 and header.minorVersion == 0:
         surfBlkType = 0x0A
         dataBlkType = 0x0B
         mipBlkType = 0x0C
 
-    elif header.majorVersion == 7:
+    elif header.majorVersion in [6, 7]:
         surfBlkType = 0x0B
         dataBlkType = 0x0C
         mipBlkType = 0x0D
@@ -149,8 +149,6 @@ def readGFD(f):
 
     if header.gpuVersion != 2:
         raise ValueError("Unsupported GPU version!")
-
-    gfd.majorVersion = header.majorVersion
 
     pos = header.size
 
@@ -324,7 +322,6 @@ def readGFD(f):
 
 
 def get_deswizzled_data(i, gfd):
-    majorVersion = gfd.majorVersion
     numImages = gfd.numImages
     numMips = gfd.numMips[i]
     width = gfd.width[i]
@@ -578,6 +575,9 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
 
     numMips += 1
 
+    if not tileMode:
+        tileMode = addrlib.getDefaultGX2TileMode(1, width, height, 1, format_, 0, 1)
+
     bpp = addrlib.surfaceGetBitsPerPixel(format_) >> 3
     surfOut = addrlib.getSurfaceInfo(format_, width, height, 1, 1, tileMode, 0, 0)
 
@@ -600,11 +600,7 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
             time.sleep(5)
             sys.exit(1)
 
-    if tileMode in [1, 2, 3, 16]:
-        s = swizzle_ << 8
-
-    else:
-        s = 0xd0000 | swizzle_ << 8
+    s = swizzle_ << 8
 
     if numMips > 1:
         print("")
@@ -619,6 +615,9 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
     swizzled_data = []
     mipSize = 0
     mipOffsets = []
+
+    tiling1dLevel = 0
+    tiling1dLevelSet = False
 
     for mipLevel in range(numMips):
         offset, size = getCurrentMipOffset_Size(width, height, blkWidth, blkHeight, bpp, mipLevel)
@@ -647,34 +646,17 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
             width_, height_, surfOut.height, format_, surfOut.tileMode,
             s, surfOut.pitch, surfOut.bpp, data_))
 
-    compSels = ["R", "G", "B", "A", "0", "1"]
+        if surfOut.tileMode in [1, 2, 3, 16]:
+            tiling1dLevelSet = True
 
-    print("")
-    print("// ----- GX2Surface Info ----- ")
-    print("  dim             = 1")
-    print("  width           = " + str(width))
-    print("  height          = " + str(height))
-    print("  depth           = 1")
-    print("  numMips         = " + str(numMips))
-    print("  format          = " + formats[format_])
-    print("  aa              = 0")
-    print("  use             = 1")
-    print("  imageSize       = " + str(imageSize))
-    print("  mipSize         = " + str(mipSize))
-    print("  tileMode        = " + str(tileMode))
-    print("  swizzle         = " + str(s) + ", " + hex(s))
-    print("  alignment       = " + str(alignment))
-    print("  pitch           = " + str(pitch))
-    print("")
-    print("  GX2 Component Selector:")
-    print("    Red Channel:    " + str(compSels[compSel[0]]))
-    print("    Green Channel:  " + str(compSels[compSel[1]]))
-    print("    Blue Channel:   " + str(compSels[compSel[2]]))
-    print("    Alpha Channel:  " + str(compSels[compSel[3]]))
-    print("")
-    print("  bits per pixel  = " + str(bpp << 3))
-    print("  bytes per pixel = " + str(bpp))
-    print("  realSize        = " + str(divRoundUp(width, blkWidth) * divRoundUp(height, blkHeight) * bpp))
+        if not tiling1dLevelSet:
+            tiling1dLevel += 1
+
+    if tiling1dLevelSet:
+        s |= tiling1dLevel << 16
+
+    else:
+        s |= 13 << 16
 
     if format_ == 1:
         if compSel not in [[0, 0, 0, 5], [0, 5, 5, 5]]:
@@ -722,6 +704,35 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
                 swizzled_data = [dds.form_conv.swapRB_32bpp(data, 'rgba8') for data in swizzled_data]
 
         compSel = [0, 1, 2, 3]
+
+    compSels = ["R", "G", "B", "A", "0", "1"]
+
+    print("")
+    print("// ----- GX2Surface Info ----- ")
+    print("  dim             = 1")
+    print("  width           = " + str(width))
+    print("  height          = " + str(height))
+    print("  depth           = 1")
+    print("  numMips         = " + str(numMips))
+    print("  format          = " + formats[format_])
+    print("  aa              = 0")
+    print("  use             = 1")
+    print("  imageSize       = " + str(imageSize))
+    print("  mipSize         = " + str(mipSize))
+    print("  tileMode        = " + str(tileMode))
+    print("  swizzle         = " + str(s) + ", " + hex(s))
+    print("  alignment       = " + str(alignment))
+    print("  pitch           = " + str(pitch))
+    print("")
+    print("  GX2 Component Selector:")
+    print("    Red Channel:    " + str(compSels[compSel[0]]))
+    print("    Green Channel:  " + str(compSels[compSel[1]]))
+    print("    Blue Channel:   " + str(compSels[compSel[2]]))
+    print("    Alpha Channel:  " + str(compSels[compSel[3]]))
+    print("")
+    print("  bits per pixel  = " + str(bpp << 3))
+    print("  bytes per pixel = " + str(bpp))
+    print("  realSize        = " + str(divRoundUp(width, blkWidth) * divRoundUp(height, blkHeight) * bpp))
 
     block_head_struct = GFDBlockHeader()
     gx2surf_blk_head = block_head_struct.pack(b"BLK{", 32, 1, 0, 0xb, 0x9c, 0, 0)
@@ -792,11 +803,30 @@ def printInfo():
     print("                       Will be ignored if the GTX has multiple images")
     print("")
     print("DDS to GTX options:")
-    print(" -tileMode <tileMode>  tileMode (4 is the default)")
-    print(" -swizzle <swizzle>    the intial swizzle value, a value from 0 to 7 (0 is the default)")
+    print(" -tileMode <tileMode>  tileMode (by default, the optimal tileMode will be selected)")
+    print(" -swizzle <swizzle>    the swizzle pattern, only values from 0 to 7 are allowed (0 is the default)")
     print(" -SRGB <n>             1 if the desired destination format is SRGB, else 0 (0 is the default)")
     print(
         " -multi <numImages>    number of images to pack into the GTX file (input file must be the first image, 1 is the default)")
+    print("")
+    print("Supported tileModes:")
+    print(" - GX2_TILE_MODE_DEFAULT (0)")
+    print(" - GX2_TILE_MODE_LINEAR_ALIGNED (1)")
+    print(" - GX2_TILE_MODE_1D_TILED_THIN1 (2)")
+    print(" - GX2_TILE_MODE_1D_TILED_THICK (3)")
+    print(" - GX2_TILE_MODE_2D_TILED_THIN1 (4)")
+    print(" - GX2_TILE_MODE_2D_TILED_THIN2 (5)")
+    print(" - GX2_TILE_MODE_2D_TILED_THIN4 (6)")
+    print(" - GX2_TILE_MODE_2D_TILED_THICK (7)")
+    print(" - GX2_TILE_MODE_2B_TILED_THIN1 (8)")
+    print(" - GX2_TILE_MODE_2B_TILED_THIN2 (9)")
+    print(" - GX2_TILE_MODE_2B_TILED_THIN4 (10)")
+    print(" - GX2_TILE_MODE_2B_TILED_THICK (11)")
+    print(" - GX2_TILE_MODE_3D_TILED_THIN1 (12)")
+    print(" - GX2_TILE_MODE_3D_TILED_THICK (13)")
+    print(" - GX2_TILE_MODE_3B_TILED_THIN1 (14)")
+    print(" - GX2_TILE_MODE_3B_TILED_THICK (15)")
+    print(" - GX2_TILE_MODE_LINEAR_SPECIAL (16)")
     print("")
     print("Supported formats:")
     print(" - GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM")
@@ -825,8 +855,8 @@ def printInfo():
 
 
 def main():
-    print("GTX Extractor v5.3")
-    print("(C) 2015-2018 AboodXD")
+    print("GTX Extractor v5.4")
+    print("(C) 2015-2019 AboodXD")
 
     input_ = sys.argv[-1]
 
@@ -847,7 +877,7 @@ def main():
         if "-tileMode" in sys.argv:
             tileMode = int(sys.argv[sys.argv.index("-tileMode") + 1], 0)
         else:
-            tileMode = 4
+            tileMode = 0
 
         if "-swizzle" in sys.argv:
             swizzle = int(sys.argv[sys.argv.index("-swizzle") + 1], 0)

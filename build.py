@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # GTX Extractor
-# Version v5.3
-# Copyright © 2015-2018 AboodXD
+# Version v5.4
+# Copyright © 2015-2019 AboodXD
 
 # This file is part of GTX Extractor.
 
@@ -25,7 +25,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = '5.3'
+version = '5.4'
 
 # Pick a build directory
 dir_ = 'gtx_extract v' + version
@@ -44,7 +44,7 @@ setup(
     name = 'GTX Extractor',
     version = version,
     description = 'Wii U GTX Extractor',
-    author = "Stella/AboodXD",
+    author = "AboodXD",
     options={
         'build_exe': {
             'compressed': 1,

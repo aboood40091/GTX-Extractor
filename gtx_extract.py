@@ -338,6 +338,7 @@ def get_deswizzled_data(i, gfd):
     dim = gfd.dim[i]
     format_ = gfd.format[i]
     aa = gfd.aa[i]
+    use = gfd.use[i]
     tileMode = gfd.tileMode[i]
     swizzle_ = gfd.swizzle[i]
     compSel = gfd.compSel[i]
@@ -474,8 +475,8 @@ def get_deswizzled_data(i, gfd):
                     data = mipData[mipOffset:mipOffset + surfOut.surfSize]
 
                 result_ = addrlib.deswizzle(
-                    width_, height_, surfOut.height, format_, surfOut.tileMode,
-                    swizzle_, surfOut.pitch, surfOut.bpp, data,
+                    width_, height_, 1, format_, 0, use, surfOut.tileMode,
+                    swizzle_, surfOut.pitch, surfOut.bpp, 0, 0, data,
                 )
 
                 result.append(result_[:size])
@@ -526,7 +527,7 @@ def getAlignBlockSize(dataOffset, alignment):
     alignSize = roundUp(dataOffset, alignment) - dataOffset - 32
 
     z = 1
-    while alignSize <= 0:
+    while alignSize < 0:
         alignSize = roundUp(dataOffset + (alignment * z), alignment) - dataOffset - 32
         z += 1
 
@@ -651,8 +652,8 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
             mipSize += surfOut.surfSize + len(dataAlignBytes)
 
         swizzled_data.append(bytearray(dataAlignBytes) + addrlib.swizzle(
-            width_, height_, surfOut.height, format_, surfOut.tileMode,
-            s, surfOut.pitch, surfOut.bpp, data_))
+            width_, height_, 1, format_, 0, 1, surfOut.tileMode,
+            s, surfOut.pitch, surfOut.bpp, 0, 0, data_))
 
         if surfOut.tileMode in [1, 2, 3, 16]:
             tiling1dLevelSet = True

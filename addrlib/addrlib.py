@@ -58,14 +58,16 @@ def GX2TileModeToAddrTileMode(tileMode):
     return tileMode
 
 
-def swizzleSurf(width, height, height_, format_, tileMode, swizzle_,
-                pitch, bitsPerPixel, data, swizzle):
+def swizzleSurf(width, height, depth, format_, aa, use, tileMode, swizzle_,
+                pitch, bitsPerPixel, slice, sample, data, dataSize, swizzle):
 
     """
     width: width of the surface
     height: height of the surface
-    height_: aligned height of the surface (can be calculated using getSurfaceInfo())
+    depth: depth of the surface
     format_: format of the surface (GX2SurfaceFormat)
+    aa: AA mode of the surface (GX2AAMode)
+    use: use of the surface (GX2SurfaceUse)
     tileMode: tileMode of the surface (GX2TileMode)
     swizzle_: swizzle of the surface (GX2Surface.swizzle)
     pitch: aligned width of the surface (can be calculated using getSurfaceInfo())
@@ -89,14 +91,14 @@ def swizzleSurf(width, height, height_, format_, tileMode, swizzle_,
     for y in range(height):
         for x in range(width):
             if tileMode in [0, 1]:
-                pos = (y * pitch + x) * bytesPerPixel
+                pos = computeSurfaceAddrFromCoordLinear(x, y, slice, sample, bytesPerPixel, pitch, height, depth)
 
             elif tileMode in [2, 3]:
-                pos = computeSurfaceAddrFromCoordMicroTiled(x, y, bitsPerPixel, pitch, tileMode)
+                pos = computeSurfaceAddrFromCoordMicroTiled(x, y, slice, bitsPerPixel, pitch, height, tileMode, bool(use & 4))
 
             else:
-                pos = computeSurfaceAddrFromCoordMacroTiled(x, y, bitsPerPixel, pitch, height_, tileMode,
-                                                            pipeSwizzle, bankSwizzle)
+                pos = computeSurfaceAddrFromCoordMacroTiled(x, y, slice, sample, bitsPerPixel, pitch, height, 1 << aa,
+                                                            tileMode, bool(use & 4), pipeSwizzle, bankSwizzle)
 
             pos_ = (y * width + x) * bytesPerPixel
 
@@ -110,16 +112,18 @@ def swizzleSurf(width, height, height_, format_, tileMode, swizzle_,
     return bytes(result)
 
 
-def deswizzle(width, height, height_, format_, tileMode, swizzle_,
-              pitch, bpp, data):
+def deswizzle(width, height, depth, format_, aa, use, tileMode, swizzle_,
+              pitch, bpp, slice, sample, data):
 
-    return swizzleSurf(width, height, height_, format_, tileMode, swizzle_, pitch, bpp, data, 0)
+    return swizzleSurf(width, height, depth, format_, aa, use, tileMode, swizzle_, pitch, bpp,
+                       slice, sample, data, len(data), False)
 
 
-def swizzle(width, height, height_, format_, tileMode, swizzle_,
-            pitch, bpp, data):
+def swizzle(width, height, depth, format_, aa, use, tileMode, swizzle_,
+            pitch, bpp, slice, sample, data):
 
-    return swizzleSurf(width, height, height_, format_, tileMode, swizzle_, pitch, bpp, data, 1)
+    return swizzleSurf(width, height, depth, format_, aa, use, tileMode, swizzle_, pitch, bpp,
+                       slice, sample, data, len(data), True)
 
 
 formatHwInfo = [
@@ -175,30 +179,78 @@ def computeSurfaceThickness(tileMode):
     return 1
 
 
-def computePixelIndexWithinMicroTile(x, y, bpp):
-    if bpp == 0x08:
-        return (32 * ((y & 4) >> 2) | 16 * (y & 1) | 8 * ((y & 2) >> 1) |
-                4 * ((x & 4) >> 2) | 2 * ((x & 2) >> 1) | x & 1)
+def computePixelIndexWithinMicroTile(x, y, z, bpp, tileMode, isDepth):
+    pixelBit6 = 0
+    pixelBit7 = 0
+    pixelBit8 = 0
 
-    elif bpp == 0x10:
-        return (32 * ((y & 4) >> 2) | 16 * ((y & 2) >> 1) | 8 * (y & 1) |
-                4 * ((x & 4) >> 2) | 2 * ((x & 2) >> 1) | x & 1)
+    thickness = computeSurfaceThickness(tileMode)
 
-    elif bpp in [0x20, 0x60]:
-        return (32 * ((y & 4) >> 2) | 16 * ((y & 2) >> 1) | 8 * ((x & 4) >> 2) |
-                4 * (y & 1) | 2 * ((x & 2) >> 1) | x & 1)
-
-    elif bpp == 0x40:
-        return (32 * ((y & 4) >> 2) | 16 * ((y & 2) >> 1) | 8 * ((x & 4) >> 2) |
-                4 * ((x & 2) >> 1) | 2 * (y & 1) | x & 1)
-
-    elif bpp == 0x80:
-        return (32 * ((y & 4) >> 2) | 16 * ((y & 2) >> 1) | 8 * ((x & 4) >> 2) |
-                4 * ((x & 2) >> 1) | 2 * (x & 1) | y & 1)
+    if isDepth:
+        pixelBit0 = x & 1
+        pixelBit1 = y & 1
+        pixelBit2 = (x & 2) >> 1
+        pixelBit3 = (y & 2) >> 1
+        pixelBit4 = (x & 4) >> 2
+        pixelBit5 = (y & 4) >> 2
 
     else:
-        return (32 * ((y & 4) >> 2) | 16 * ((y & 2) >> 1) | 8 * ((x & 4) >> 2) |
-                4 * (y & 1) | 2 * ((x & 2) >> 1) | x & 1)
+        if bpp == 8:
+            pixelBit0 = x & 1
+            pixelBit1 = (x & 2) >> 1
+            pixelBit2 = (x & 4) >> 2
+            pixelBit3 = (y & 2) >> 1
+            pixelBit4 = y & 1
+            pixelBit5 = (y & 4) >> 2
+
+        elif bpp == 0x10:
+            pixelBit0 = x & 1
+            pixelBit1 = (x & 2) >> 1
+            pixelBit2 = (x & 4) >> 2
+            pixelBit3 = y & 1
+            pixelBit4 = (y & 2) >> 1
+            pixelBit5 = (y & 4) >> 2
+
+        elif bpp in [0x20, 0x60]:
+            pixelBit0 = x & 1
+            pixelBit1 = (x & 2) >> 1
+            pixelBit2 = y & 1
+            pixelBit3 = (x & 4) >> 2
+            pixelBit4 = (y & 2) >> 1
+            pixelBit5 = (y & 4) >> 2
+
+        elif bpp == 0x40:
+            pixelBit0 = x & 1
+            pixelBit1 = y & 1
+            pixelBit2 = (x & 2) >> 1
+            pixelBit3 = (x & 4) >> 2
+            pixelBit4 = (y & 2) >> 1
+            pixelBit5 = (y & 4) >> 2
+
+        elif bpp == 0x80:
+            pixelBit0 = y & 1
+            pixelBit1 = x & 1
+            pixelBit2 = (x & 2) >> 1
+            pixelBit3 = (x & 4) >> 2
+            pixelBit4 = (y & 2) >> 1
+            pixelBit5 = (y & 4) >> 2
+
+        else:
+            pixelBit0 = x & 1
+            pixelBit1 = (x & 2) >> 1
+            pixelBit2 = y & 1
+            pixelBit3 = (x & 4) >> 2
+            pixelBit4 = (y & 2) >> 1
+            pixelBit5 = (y & 4) >> 2
+
+    if thickness > 1:
+        pixelBit6 = z & 1
+        pixelBit7 = (z & 2) >> 1
+
+    if thickness == 8:
+        pixelBit8 = (z & 4) >> 2
+
+    return (pixelBit8 << 8) | (pixelBit7 << 7) | (pixelBit6 << 6) | 32 * pixelBit5 | 16 * pixelBit4 | 8 * pixelBit3 | 4 * pixelBit2 | pixelBit0 | 2 * pixelBit1;
 
 
 def computePipeFromCoordWoRotation(x, y):
@@ -207,6 +259,16 @@ def computePipeFromCoordWoRotation(x, y):
 
 def computeBankFromCoordWoRotation(x, y):
     return ((y >> 5) ^ (x >> 3)) & 1 | 2 * (((y >> 4) ^ (x >> 4)) & 1)
+
+
+def computeSurfaceRotationFromTileMode(tileMode):
+    if tileMode in [4, 5, 6, 7, 8, 9, 10, 11]:
+        return 2
+
+    elif tileMode in [12, 13, 14, 15]:
+        return 1
+
+    return 0
 
 
 def isThickMacroTiled(tileMode):
@@ -233,7 +295,7 @@ def computeMacroTileAspectRatio(tileMode):
     return 1
 
 
-def computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples=1):
+def computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch):
     if isBankSwappedTileMode(tileMode) == 0:
         return 0
 
@@ -266,9 +328,17 @@ def computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples=1):
     return bankSwapWidth
 
 
-def computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode):
-    microTileThickness = 1
+def computeSurfaceAddrFromCoordLinear(x, y, slice, sample, bpp, pitch, height, numSlices):
+    sliceOffset = pitch * height * (slice + sample * numSlices)
+    addr = (y * pitch + x + sliceOffset) * bpp
+    
+    return addr
 
+
+def computeSurfaceAddrFromCoordMicroTiled(x, y, slice, bpp, pitch, height,
+                                          tileMode, isDepth):
+
+    microTileThickness = 1
     if tileMode == 3:
         microTileThickness = 4
 
@@ -276,41 +346,57 @@ def computeSurfaceAddrFromCoordMicroTiled(x, y, bpp, pitch, tileMode):
     microTilesPerRow = pitch >> 3
     microTileIndexX = x >> 3
     microTileIndexY = y >> 3
+    microTileIndexZ = slice // microTileThickness
 
     microTileOffset = microTileBytes * (microTileIndexX + microTileIndexY * microTilesPerRow)
-    pixelIndex = computePixelIndexWithinMicroTile(x, y, bpp)
+    sliceBytes = (pitch * height * microTileThickness * bpp + 7) // 8
+    sliceOffset = microTileIndexZ * sliceBytes;
+
+
+    pixelIndex = computePixelIndexWithinMicroTile(x, y, slice, bpp, tileMode, isDepth)
     pixelOffset = (bpp * pixelIndex) >> 3
 
-    return pixelOffset + microTileOffset
+    return pixelOffset + microTileOffset + sliceOffset
 
 
 bankSwapOrder = [0, 1, 3, 2, 6, 7, 5, 4, 0, 0]
 
 
-def computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height,
-                                          tileMode, pipeSwizzle,
-                                          bankSwizzle):
+def computeSurfaceAddrFromCoordMacroTiled(x, y, slice, sample, bpp, pitch, height,
+                                          numSamples, tileMode, isDepth,
+                                          pipeSwizzle, bankSwizzle):
 
     microTileThickness = computeSurfaceThickness(tileMode)
 
-    microTileBits = bpp * (microTileThickness * 64)
+    microTileBits = numSamples * bpp * (microTileThickness * 64)
     microTileBytes = (microTileBits + 7) // 8
 
-    pixelIndex = computePixelIndexWithinMicroTile(x, y, bpp)
-    elemOffset = bpp * pixelIndex
+    pixelIndex = computePixelIndexWithinMicroTile(x, y, slice, bpp, tileMode, isDepth)
+    bytesPerSample = microTileBytes // numSamples
 
-    bytesPerSample = microTileBytes
+    if isDepth:
+        sampleOffset = bpp * sample
+        pixelOffset = numSamples * bpp * pixelIndex
 
-    if microTileBytes <= 2048:
-        numSamples = 1
+    else:
+        sampleOffset = sample * (microTileBits // numSamples)
+        pixelOffset = bpp * pixelIndex
+
+    elemOffset = pixelOffset + sampleOffset
+
+    if numSamples <= 1 or microTileBytes <= 2048:
+        samplesPerSlice = numSamples
+        numSampleSplits = 1
         sampleSlice = 0
 
     else:
         samplesPerSlice = 2048 // bytesPerSample
-        numSampleSplits = max(1, 1 // samplesPerSlice)
+        numSampleSplits = numSamples // samplesPerSlice
         numSamples = samplesPerSlice
-        sampleSlice = elemOffset // (microTileBits // numSampleSplits)
-        elemOffset %= microTileBits // numSampleSplits
+
+        tileSliceBits = microTileBits // numSampleSplits
+        sampleSlice = elemOffset // tileSliceBits
+        elemOffset %= tileSliceBits
 
     elemOffset = (elemOffset + 7) // 8
 
@@ -318,24 +404,31 @@ def computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height,
     bank = computeBankFromCoordWoRotation(x, y)
 
     swizzle_ = pipeSwizzle + 2 * bankSwizzle
-    bankPipe = ((pipe + 2 * bank) ^ (6 * sampleSlice ^ swizzle_)) % 8
+    bankPipe = pipe + 2 * bank
+    rotation = computeSurfaceRotationFromTileMode(tileMode)
+    sliceIn = slice
 
+    if isThickMacroTiled(tileMode):
+        sliceIn >>= 2
+
+    bankPipe ^= 2 * sampleSlice * 3 ^ (swizzle_ + sliceIn * rotation)
+    bankPipe %= 8
     pipe = bankPipe % 2
     bank = bankPipe // 2
 
     sliceBytes = (height * pitch * microTileThickness * bpp * numSamples + 7) // 8
-    sliceOffset = sliceBytes * (sampleSlice // microTileThickness)
+    sliceOffset = sliceBytes * ((sampleSlice + numSampleSplits * slice) // microTileThickness)
 
     macroTilePitch = 32
     macroTileHeight = 16
 
     if tileMode in [5, 9]:  # GX2_TILE_MODE_2D_TILED_THIN2 and GX2_TILE_MODE_2B_TILED_THIN2
-        macroTilePitch >>= 1
-        macroTileHeight *= 2
+        macroTilePitch = 16
+        macroTileHeight = 32
 
     elif tileMode in [6, 10]:  # GX2_TILE_MODE_2D_TILED_THIN4 and GX2_TILE_MODE_2B_TILED_THIN4
-        macroTilePitch >>= 2
-        macroTileHeight *= 4
+        macroTilePitch = 8
+        macroTileHeight = 64
 
     macroTilesPerRow = pitch // macroTilePitch
     macroTileBytes = (numSamples * microTileThickness * bpp * macroTileHeight
@@ -344,13 +437,13 @@ def computeSurfaceAddrFromCoordMacroTiled(x, y, bpp, pitch, height,
     macroTileIndexY = y // macroTileHeight
     macroTileOffset = (macroTileIndexX + macroTilesPerRow * macroTileIndexY) * macroTileBytes
 
-    if tileMode in [8, 9, 10, 11, 14, 15]:
-        bankSwapWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, 1)
+    if isBankSwappedTileMode(tileMode):
+        bankSwapWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch)
         swapIndex = macroTilePitch * macroTileIndexX // bankSwapWidth
         bank ^= bankSwapOrder[swapIndex & 3]
 
     totalOffset = elemOffset + ((macroTileOffset + sliceOffset) >> 3)
-    return bank << 9 | pipe << 8 | 255 & totalOffset | (totalOffset & -256) << 3
+    return bank << 9 | pipe << 8 | totalOffset & 255 | (totalOffset & -256) << 3
 
 
 expPitch = 0
@@ -422,10 +515,6 @@ pOut = surfaceOut()
 
 def powTwoAlign(x, align):
     return ~(align - 1) & (x + align - 1)
-
-
-def powTwoAlign_0(x, align):
-    return (x + align - 1) & ~(align - 1)
 
 
 def nextPow2(dim):
@@ -620,69 +709,68 @@ def computeSurfaceMipLevelTileMode(baseTileMode, bpp, level, width, height, numS
         if numSamples in [2, 4]:  # Mistake, should be elif?
             expTileMode = 7
 
-    if not noRecursive:
-        if bpp in [24, 48, 96]:
-            bpp //= 3
+    if noRecursive or not level:
+        return expTileMode
 
-        widtha = nextPow2(width)
-        heighta = nextPow2(height)
-        numSlicesa = nextPow2(numSlices)
+    if bpp in [24, 48, 96]:
+        bpp //= 3
 
-        if level:
-            expTileMode = convertToNonBankSwappedMode(expTileMode)
-            thickness = computeSurfaceThickness(expTileMode)
-            microTileBytes = (numSamples * bpp * (thickness << 6) + 7) >> 3
+    widtha = nextPow2(width)
+    heighta = nextPow2(height)
+    numSlicesa = nextPow2(numSlices)
 
-            if microTileBytes < 256:
-                widthAlignFactor = max(1, 256 // microTileBytes)
+    expTileMode = convertToNonBankSwappedMode(expTileMode)
+    thickness = computeSurfaceThickness(expTileMode)
+    microTileBytes = (numSamples * bpp * (thickness << 6) + 7) >> 3
 
-            if expTileMode in [4, 12]:
-                if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
-                    expTileMode = 2
+    if microTileBytes < 256:
+        widthAlignFactor = max(1, 256 // microTileBytes)
 
-            elif expTileMode == 5:
-                macroTileWidth = 16
-                macroTileHeight = 32
+    if expTileMode in [4, 12]:
+        if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
+            expTileMode = 2
 
-                if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
-                    expTileMode = 2
+    elif expTileMode == 5:
+        macroTileWidth = 16
+        macroTileHeight = 32
 
-            elif expTileMode == 6:
-                macroTileWidth = 8
-                macroTileHeight = 64
+        if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
+            expTileMode = 2
 
-                if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
-                    expTileMode = 2
+    elif expTileMode == 6:
+        macroTileWidth = 8
+        macroTileHeight = 64
 
-            if expTileMode in [7, 13]:
-                if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
-                    expTileMode = 3
+        if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
+            expTileMode = 2
 
-            if numSlicesa < 4:
-                if expTileMode == 3:
-                    expTileMode = 2
+    if expTileMode in [7, 13]:
+        if (widtha < widthAlignFactor * macroTileWidth) or heighta < macroTileHeight:
+            expTileMode = 3
 
-                elif expTileMode == 7:
-                    expTileMode = 4
+    if numSlicesa < 4:
+        if expTileMode == 3:
+            expTileMode = 2
 
-                elif expTileMode == 13:
-                    expTileMode = 12
+        elif expTileMode == 7:
+            expTileMode = 4
 
-            return computeSurfaceMipLevelTileMode(
-                expTileMode,
-                bpp,
-                level,
-                widtha,
-                heighta,
-                numSlicesa,
-                numSamples,
-                isDepth,
-                1)
+        elif expTileMode == 13:
+            expTileMode = 12
 
-    return expTileMode
+    return computeSurfaceMipLevelTileMode(
+        expTileMode,
+        bpp,
+        level,
+        widtha,
+        heighta,
+        numSlicesa,
+        numSamples,
+        isDepth,
+        1)
 
 
-def padDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, heightAlign, sliceAlign):
+def padDimensions(tileMode, padDims, isCube, pitchAlign, heightAlign, sliceAlign):
     global expPitch
     global expHeight
     global expNumSlices
@@ -695,7 +783,7 @@ def padDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, heightAlig
         expPitch = powTwoAlign(expPitch, pitchAlign)
 
     else:
-        expPitch = pitchAlign + expPitch - 1
+        expPitch += pitchAlign - 1
         expPitch //= pitchAlign
         expPitch *= pitchAlign
 
@@ -703,7 +791,7 @@ def padDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, heightAlig
         expHeight = powTwoAlign(expHeight, heightAlign)
 
     if padDims > 2 or thickness > 1:
-        if isCube or cubeAsArray:
+        if isCube:
             expNumSlices = nextPow2(expNumSlices)
 
         if thickness > 1:
@@ -714,7 +802,7 @@ def padDimensions(tileMode, padDims, isCube, cubeAsArray, pitchAlign, heightAlig
 
 def adjustPitchAlignment(flags, pitchAlign):
     if (flags.value >> 13) & 1:
-        pitchAlign = powTwoAlign_0(pitchAlign, 0x20)
+        pitchAlign = powTwoAlign(pitchAlign, 0x20)
 
     return pitchAlign
 
@@ -779,7 +867,6 @@ def computeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, height, numSlices
         tileMode,
         padDims,
         (flags.value >> 4) & 1,
-        (flags.value >> 7) & 1,
         pitchAlign,
         heightAlign,
         microTileThickness)
@@ -788,16 +875,16 @@ def computeSurfaceInfoLinear(tileMode, bpp, numSamples, pitch, height, numSlices
         expPitch *= 3
 
     slices = expNumSlices * numSamples // microTileThickness
-    pPitchOut = expPitch
-    pHeightOut = expHeight
-    pNumSlicesOut = expNumSlices
-    pSurfSize = (expHeight * expPitch * slices * bpp * numSamples + 7) // 8
-    pBaseAlign = baseAlign
-    pPitchAlign = pitchAlign
-    pHeightAlign = heightAlign
-    pDepthAlign = microTileThickness
+    pOut.pitch = expPitch
+    pOut.height = expHeight
+    pOut.depth = expNumSlices
+    pOut.surfSize = (expHeight * expPitch * slices * bpp * numSamples + 7) // 8
+    pOut.baseAlign = baseAlign
+    pOut.pitchAlign = pitchAlign
+    pOut.heightAlign = heightAlign
+    pOut.depthAlign = microTileThickness
 
-    return valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign
+    return valid
 
 
 def computeSurfaceAlignmentsMicroTiled(tileMode, bpp, flags, numSamples):
@@ -856,22 +943,21 @@ def computeSurfaceInfoMicroTiled(tileMode, bpp, numSamples, pitch, height, numSl
         expTileMode,
         padDims,
         (flags.value >> 4) & 1,
-        (flags.value >> 7) & 1,
         pitchAlign,
         heightAlign,
         microTileThickness)
 
-    pPitchOut = expPitch
-    pHeightOut = expHeight
-    pNumSlicesOut = expNumSlices
-    pSurfSize = (expHeight * expPitch * expNumSlices * bpp * numSamples + 7) // 8
-    pTileModeOut = expTileMode
-    pBaseAlign = baseAlign
-    pPitchAlign = pitchAlign
-    pHeightAlign = heightAlign
-    pDepthAlign = microTileThickness
+    pOut.pitch = expPitch
+    pOut.height = expHeight
+    pOut.depth = expNumSlices
+    pOut.surfSize = (expHeight * expPitch * expNumSlices * bpp * numSamples + 7) // 8
+    pOut.tileMode = expTileMode
+    pOut.baseAlign = baseAlign
+    pOut.pitchAlign = pitchAlign
+    pOut.heightAlign = heightAlign
+    pOut.depthAlign = microTileThickness
 
-    return valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign
+    return valid
 
 
 def computeSurfaceAlignmentsMacroTiled(tileMode, bpp, flags, numSamples):
@@ -944,7 +1030,7 @@ def computeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch,
             flags,
             numSamples)
 
-        bankSwappedWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples)
+        bankSwappedWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch)
 
         if bankSwappedWidth > pitchAlign:
             pitchAlign = bankSwappedWidth
@@ -953,20 +1039,19 @@ def computeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch,
             tileMode,
             padDims,
             (flags.value >> 4) & 1,
-            (flags.value >> 7) & 1,
             pitchAlign,
             heightAlign,
             microTileThickness)
 
-        pPitchOut = expPitch
-        pHeightOut = expHeight
-        pNumSlicesOut = expNumSlices
-        pSurfSize = (expHeight * expPitch * expNumSlices * bpp * numSamples + 7) // 8
-        pTileModeOut = expTileMode
-        pBaseAlign = baseAlign
-        pPitchAlign = pitchAlign
-        pHeightAlign = heightAlign
-        pDepthAlign = microTileThickness
+        pOut.pitch = expPitch
+        pOut.height = expHeight
+        pOut.depth = expNumSlices
+        pOut.surfSize = (expHeight * expPitch * expNumSlices * bpp * numSamples + 7) // 8
+        pOut.tileMode = expTileMode
+        pOut.baseAlign = baseAlign
+        pOut.pitchAlign = pitchAlign
+        pOut.heightAlign = heightAlign
+        pOut.depthAlign = microTileThickness
         result = valid
 
     else:
@@ -981,7 +1066,7 @@ def computeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch,
         if expPitch < pitchAlign * pitchAlignFactor or expHeight < heightAlign:
             expTileMode = 2
 
-            result, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoMicroTiled(
+            result = computeSurfaceInfoMicroTiled(
                 2,
                 bpp,
                 numSamples,
@@ -999,7 +1084,7 @@ def computeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch,
                 flags,
                 numSamples)
 
-            bankSwappedWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, pitch, numSamples)
+            bankSwappedWidth = computeSurfaceBankSwappedWidth(tileMode, bpp, numSamples, pitch)
             if bankSwappedWidth > pitchAlign:
                 pitchAlign = bankSwappedWidth
 
@@ -1007,23 +1092,22 @@ def computeSurfaceInfoMacroTiled(tileMode, baseTileMode, bpp, numSamples, pitch,
                 tileMode,
                 padDims,
                 (flags.value >> 4) & 1,
-                (flags.value >> 7) & 1,
                 pitchAlign,
                 heightAlign,
                 microTileThickness)
 
-            pPitchOut = expPitch
-            pHeightOut = expHeight
-            pNumSlicesOut = expNumSlices
-            pSurfSize = (expHeight * expPitch * expNumSlices * bpp * numSamples + 7) // 8
-            pTileModeOut = expTileMode
-            pBaseAlign = baseAlign
-            pPitchAlign = pitchAlign
-            pHeightAlign = heightAlign
-            pDepthAlign = microTileThickness
+            pOut.pitch = expPitch
+            pOut.height = expHeight
+            pOut.depth = expNumSlices
+            pOut.surfSize = (expHeight * expPitch * expNumSlices * bpp * numSamples + 7) // 8
+            pOut.tileMode = expTileMode
+            pOut.baseAlign = baseAlign
+            pOut.pitchAlign = pitchAlign
+            pOut.heightAlign = heightAlign
+            pOut.depthAlign = microTileThickness
             result = valid
 
-    return result, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign
+    return result
 
 
 def ComputeSurfaceInfoEx():
@@ -1036,15 +1120,6 @@ def ComputeSurfaceInfoEx():
     mipLevel = pIn.mipLevel
     flags = Flags()
     flags.value = pIn.flags.value
-    pPitchOut = pOut.pitch
-    pHeightOut = pOut.height
-    pNumSlicesOut = pOut.depth
-    pTileModeOut = pOut.tileMode
-    pSurfSize = pOut.surfSize
-    pBaseAlign = pOut.baseAlign
-    pPitchAlign = pOut.pitchAlign
-    pHeightAlign = pOut.heightAlign
-    pDepthAlign = pOut.depthAlign
     padDims = 0
     valid = 0
     baseTileMode = tileMode
@@ -1068,7 +1143,7 @@ def ComputeSurfaceInfoEx():
             0)
 
     if tileMode in [0, 1]:
-        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoLinear(
+        valid = computeSurfaceInfoLinear(
             tileMode,
             bpp,
             numSamples,
@@ -1079,10 +1154,10 @@ def ComputeSurfaceInfoEx():
             padDims,
             flags)
 
-        pTileModeOut = tileMode
+        pOut.tileMode = tileMode
 
     elif tileMode in [2, 3]:
-        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoMicroTiled(
+        valid = computeSurfaceInfoMicroTiled(
             tileMode,
             bpp,
             numSamples,
@@ -1094,7 +1169,7 @@ def ComputeSurfaceInfoEx():
             flags)
 
     elif tileMode in [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]:
-        valid, pPitchOut, pHeightOut, pNumSlicesOut, pSurfSize, pTileModeOut, pBaseAlign, pPitchAlign, pHeightAlign, pDepthAlign = computeSurfaceInfoMacroTiled(
+        valid = computeSurfaceInfoMacroTiled(
             tileMode,
             baseTileMode,
             bpp,
@@ -1105,16 +1180,6 @@ def ComputeSurfaceInfoEx():
             mipLevel,
             padDims,
             flags)
-
-    pOut.pitch = pPitchOut
-    pOut.height = pHeightOut
-    pOut.depth = pNumSlicesOut
-    pOut.tileMode = pTileModeOut
-    pOut.surfSize = pSurfSize
-    pOut.baseAlign = pBaseAlign
-    pOut.pitchAlign = pPitchAlign
-    pOut.heightAlign = pHeightAlign
-    pOut.depthAlign = pDepthAlign
 
     if not valid:
         return 3
@@ -1165,6 +1230,7 @@ def computeSurfaceInfo(aSurfIn, pSurfOut):
     pOut = pSurfOut
 
     returnCode = 0
+    elemMode = 0
 
     if pIn.bpp > 0x80:
         returnCode = 3
@@ -1368,5 +1434,8 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
         computeSurfaceInfo(aSurfIn, pSurfOut)
 
         pSurfOut = pOut
+
+    if not pSurfOut.tileMode:
+        pSurfOut.tileMode = 16
 
     return pSurfOut

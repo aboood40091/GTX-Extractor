@@ -600,6 +600,45 @@ class pyClass:
     pass
 
 
+def surfaceOutToPyClass(surfaceOut pSurfOut):
+    # We can't return a Cython class
+    # Copy the attributes from our Cython class to a Python class
+    # and return it instead
+    pypOut = pyClass()
+    pypTileInfo = pyClass() 
+
+    pypTileInfo.banks = pSurfOut.pTileInfo.banks
+    pypTileInfo.bankWidth = pSurfOut.pTileInfo.bankWidth
+    pypTileInfo.bankHeight = pSurfOut.pTileInfo.bankHeight
+    pypTileInfo.macroAspectRatio = pSurfOut.pTileInfo.macroAspectRatio
+    pypTileInfo.tileSplitBytes = pSurfOut.pTileInfo.tileSplitBytes
+    pypTileInfo.pipeConfig = pSurfOut.pTileInfo.pipeConfig
+
+    pypOut.size = pSurfOut.size
+    pypOut.pitch = pSurfOut.pitch
+    pypOut.height = pSurfOut.height
+    pypOut.depth = pSurfOut.depth
+    pypOut.surfSize = pSurfOut.surfSize
+    pypOut.tileMode = pSurfOut.tileMode
+    pypOut.baseAlign = pSurfOut.baseAlign
+    pypOut.pitchAlign = pSurfOut.pitchAlign
+    pypOut.heightAlign = pSurfOut.heightAlign
+    pypOut.depthAlign = pSurfOut.depthAlign
+    pypOut.bpp = pSurfOut.bpp
+    pypOut.pixelPitch = pSurfOut.pixelPitch
+    pypOut.pixelHeight = pSurfOut.pixelHeight
+    pypOut.pixelBits = pSurfOut.pixelBits
+    pypOut.sliceSize = pSurfOut.sliceSize
+    pypOut.pitchTileMax = pSurfOut.pitchTileMax
+    pypOut.heightTileMax = pSurfOut.heightTileMax
+    pypOut.sliceTileMax = pSurfOut.sliceTileMax
+    pypOut.pTileInfo = pypTileInfo
+    pypOut.tileType = pSurfOut.tileType
+    pypOut.tileIndex = pSurfOut.tileIndex
+
+    return pypOut
+
+
 cdef:
     surfaceIn pIn = surfaceIn()
     surfaceOut pOut = surfaceOut()
@@ -1451,7 +1490,7 @@ def getSurfaceInfo(u32 surfaceFormat, u32 surfaceWidth, u32 surfaceHeight, u32 s
         width = ~(blockSize - 1) & ((surfaceWidth >> level) + blockSize - 1)
 
         if hwFormat == 0x35:
-            return pSurfOut
+            return surfaceOutToPyClass(pSurfOut)
 
         pSurfOut.bpp = formatHwInfo[hwFormat * 4]
         pSurfOut.size = 96
@@ -1569,39 +1608,4 @@ def getSurfaceInfo(u32 surfaceFormat, u32 surfaceWidth, u32 surfaceHeight, u32 s
     if not pSurfOut.tileMode:
         pSurfOut.tileMode = 16
 
-    # We can't return a Cython class
-    # Copy the attributes from our Cython class to a Python class
-    # and return it instead
-    pypOut = pyClass()
-    pypTileInfo = pyClass() 
-
-    pypTileInfo.banks = pSurfOut.pTileInfo.banks
-    pypTileInfo.bankWidth = pSurfOut.pTileInfo.bankWidth
-    pypTileInfo.bankHeight = pSurfOut.pTileInfo.bankHeight
-    pypTileInfo.macroAspectRatio = pSurfOut.pTileInfo.macroAspectRatio
-    pypTileInfo.tileSplitBytes = pSurfOut.pTileInfo.tileSplitBytes
-    pypTileInfo.pipeConfig = pSurfOut.pTileInfo.pipeConfig
-
-    pypOut.size = pSurfOut.size
-    pypOut.pitch = pSurfOut.pitch
-    pypOut.height = pSurfOut.height
-    pypOut.depth = pSurfOut.depth
-    pypOut.surfSize = pSurfOut.surfSize
-    pypOut.tileMode = pSurfOut.tileMode
-    pypOut.baseAlign = pSurfOut.baseAlign
-    pypOut.pitchAlign = pSurfOut.pitchAlign
-    pypOut.heightAlign = pSurfOut.heightAlign
-    pypOut.depthAlign = pSurfOut.depthAlign
-    pypOut.bpp = pSurfOut.bpp
-    pypOut.pixelPitch = pSurfOut.pixelPitch
-    pypOut.pixelHeight = pSurfOut.pixelHeight
-    pypOut.pixelBits = pSurfOut.pixelBits
-    pypOut.sliceSize = pSurfOut.sliceSize
-    pypOut.pitchTileMax = pSurfOut.pitchTileMax
-    pypOut.heightTileMax = pSurfOut.heightTileMax
-    pypOut.sliceTileMax = pSurfOut.sliceTileMax
-    pypOut.pTileInfo = pypTileInfo
-    pypOut.tileType = pSurfOut.tileType
-    pypOut.tileIndex = pSurfOut.tileIndex
-
-    return pypOut
+    return surfaceOutToPyClass(pSurfOut)

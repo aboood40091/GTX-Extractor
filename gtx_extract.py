@@ -432,7 +432,11 @@ def get_deswizzled_data(i, gfd):
             elif format_ == 0x235:
                 format__ = "BC5S"
 
-            if surfOut.depth != 1:
+            tilingDepth = surfOut.depth
+            if surfOut.tileMode == 3:
+                tilingDepth //= 4
+
+            if tilingDepth != 1:
                 print("")
                 print("Unsupported depth!")
                 print("")
@@ -594,7 +598,11 @@ def writeGFD(f, tileMode, swizzle_, SRGB, n, pos, numImages):
     imageSize = surfOut.surfSize
     pitch = surfOut.pitch
 
-    if surfOut.depth != 1:
+    tilingDepth = surfOut.depth
+    if surfOut.tileMode == 3:
+        tilingDepth //= 4
+
+    if tilingDepth != 1:
         print("")
         print("Unsupported depth!")
         print("")

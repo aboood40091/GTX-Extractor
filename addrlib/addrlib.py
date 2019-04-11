@@ -250,7 +250,7 @@ def computePixelIndexWithinMicroTile(x, y, z, bpp, tileMode, isDepth):
     if thickness == 8:
         pixelBit8 = (z & 4) >> 2
 
-    return (pixelBit8 << 8) | (pixelBit7 << 7) | (pixelBit6 << 6) | 32 * pixelBit5 | 16 * pixelBit4 | 8 * pixelBit3 | 4 * pixelBit2 | pixelBit0 | 2 * pixelBit1;
+    return (pixelBit8 << 8) | (pixelBit7 << 7) | (pixelBit6 << 6) | 32 * pixelBit5 | 16 * pixelBit4 | 8 * pixelBit3 | 4 * pixelBit2 | pixelBit0 | 2 * pixelBit1
 
 
 def computePipeFromCoordWoRotation(x, y):
@@ -350,8 +350,7 @@ def computeSurfaceAddrFromCoordMicroTiled(x, y, slice, bpp, pitch, height,
 
     microTileOffset = microTileBytes * (microTileIndexX + microTileIndexY * microTilesPerRow)
     sliceBytes = (pitch * height * microTileThickness * bpp + 7) // 8
-    sliceOffset = microTileIndexZ * sliceBytes;
-
+    sliceOffset = microTileIndexZ * sliceBytes
 
     pixelIndex = computePixelIndexWithinMicroTile(x, y, slice, bpp, tileMode, isDepth)
     pixelOffset = (bpp * pixelIndex) >> 3
@@ -1317,10 +1316,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
         else:
             blockSize = 4
 
-        width = ~(blockSize - 1) & ((surfaceWidth >> level) + blockSize - 1)
-
-        if hwFormat == 0x35:
-            return pSurfOut
+        width = ~(blockSize - 1) & (max(1, surfaceWidth >> level) + blockSize - 1)
 
         pSurfOut.bpp = formatHwInfo[hwFormat * 4]
         pSurfOut.size = 96
@@ -1356,13 +1352,9 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
             pSurfOut.height = max(1, surfaceHeight >> level)
             pSurfOut.depth = surfaceDepth
 
-        pSurfOut.height = (~(blockSize - 1) & (pSurfOut.height + blockSize - 1)) // blockSize
-        pSurfOut.pixelPitch = ~(blockSize - 1) & ((surfaceWidth >> level) + blockSize - 1)
-        pSurfOut.pixelPitch = max(blockSize, pSurfOut.pixelPitch)
-        pSurfOut.pixelHeight = ~(blockSize - 1) & ((surfaceHeight >> level) + blockSize - 1)
-        pSurfOut.pixelHeight = max(blockSize, pSurfOut.pixelHeight)
-        pSurfOut.pitch = max(1, pSurfOut.pitch)
-        pSurfOut.height = max(1, pSurfOut.height)
+        pSurfOut.pixelPitch = width
+        pSurfOut.pixelHeight = ~(blockSize - 1) & (pSurfOut.height + blockSize - 1)
+        pSurfOut.height = pSurfOut.pixelHeight // blockSize
         pSurfOut.surfSize = pSurfOut.bpp * numSamples * pSurfOut.depth * pSurfOut.height * pSurfOut.pitch >> 3
 
         if surfaceDim == 2:

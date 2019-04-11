@@ -1332,7 +1332,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
             pSurfOut.height = 1
             pSurfOut.depth = 1
 
-        elif dim == 1:
+        elif dim in [1, 6]:
             pSurfOut.height = max(1, surfaceHeight >> level)
             pSurfOut.depth = 1
 
@@ -1348,7 +1348,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
             pSurfOut.height = 1
             pSurfOut.depth = surfaceDepth
 
-        elif dim == 5:
+        elif dim in [5, 7]:
             pSurfOut.height = max(1, surfaceHeight >> level)
             pSurfOut.depth = surfaceDepth
 
@@ -1381,7 +1381,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
             aSurfIn.height = 1
             aSurfIn.numSlices = 1
 
-        elif dim == 1:
+        elif dim in [1, 6]:
             aSurfIn.height = max(1, surfaceHeight >> level)
             aSurfIn.numSlices = 1
 
@@ -1398,15 +1398,7 @@ def getSurfaceInfo(surfaceFormat, surfaceWidth, surfaceHeight, surfaceDepth, sur
             aSurfIn.height = 1
             aSurfIn.numSlices = surfaceDepth
 
-        elif dim == 5:
-            aSurfIn.height = max(1, surfaceHeight >> level)
-            aSurfIn.numSlices = surfaceDepth
-
-        elif dim == 6:
-            aSurfIn.height = max(1, surfaceHeight >> level)
-            aSurfIn.numSlices = 1
-
-        elif dim == 7:
+        elif dim in [5, 7]:
             aSurfIn.height = max(1, surfaceHeight >> level)
             aSurfIn.numSlices = surfaceDepth
 
